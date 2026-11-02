@@ -1232,16 +1232,17 @@ class BleConnectionManager private constructor(private val appContext: Context) 
     // yankıların optimistic UI state'i ezmesini engeller.
     private val ancEchoGuard = AncEchoGuard()
 
-    // cmdId bazlı doğrulama job'ları: aynı cmdId yeniden planlanınca SADECE kendi job'ı
-    // iptal edilir, farklı cmdId'lerin bekleyen doğrulamaları çakışmaz.
+    // cmdId+gecikme bazlı doğrulama job'ları: aynı cmdId AYNI gecikmeyle yeniden planlanınca
+    // SADECE kendi job'ı iptal edilir (650ms + 3500ms multipoint doğrulamaları birlikte yaşar).
     // Ana thread (setAnc/setGameMode/setMultipoint) ve Binder GATT thread'i (processQcyFrame)
     // birlikte yazdığı için eşzamanlılık güvenli ConcurrentHashMap.
-    private val verifyJobs = ConcurrentHashMap<Byte, Job>()
+    private val verifyJobs = ConcurrentHashMap<Pair<Byte, Long>, Job>()
 
     private fun scheduleStateVerification(vararg cmdIds: Byte, delayMs: Long = 650L) {
         cmdIds.forEach { cid ->
-            verifyJobs[cid]?.cancel()
-            verifyJobs[cid] = coroutineScope.launch {
+            val key = cid to delayMs
+            verifyJobs[key]?.cancel()
+            verifyJobs[key] = coroutineScope.launch {
                 delay(delayMs)
                 if (_deviceState.value.isConnected) {
                     sendCommand(QcyProtocol.packFrame(QcyProtocol.CMD_REQUEST_ALL_DATA, cid))
@@ -1286,8 +1287,8 @@ class BleConnectionManager private constructor(private val appContext: Context) 
         if (!_deviceState.value.isConnected) return
 
         sendCommand(QcyProtocol.createRequestAllDataCommand())
-        // Query all official QCY setting beans (ANC 23, Game 9, InEar 6, Peidai 44, Sleep 16, Balance 22, ToneVol 29, MultiEQ 34, LDAC 35, Multipoint 36, KeyFun 43, PhoneInfo 77, PhoneStatus 79, AI ANC 84)
-        val beansToQuery = listOf(23, 9, 6, 44, 16, 22, 29, 34, 35, 36, 43, 77, 79, 84)
+        // Query all official QCY setting beans (ANC 23, Game 9, InEar 6, Peidai 44, Sleep 16, Balance 22, ToneVol 29, MultiEQ 34, LDAC 35, Multipoint 36, KeyFun 43, AI ANC 84)
+        val beansToQuery = listOf(23, 9, 6, 44, 16, 22, 29, 34, 35, 36, 43, 84)
         beansToQuery.forEach { cid ->
             sendCommand(QcyProtocol.packFrame(QcyProtocol.CMD_REQUEST_ALL_DATA, cid.toByte()))
         }
@@ -1927,12 +1928,7 @@ class BleConnectionManager private constructor(private val appContext: Context) 
                 if (statusPair != null) {
                     val (mac, active) = statusPair
                     _deviceState.update { state ->
-                        state.copy(
-                            pairedPhones = state.pairedPhones.map { p ->
-                                if (p.mac.equals(mac, ignoreCase = true)) p.copy(isAudioActive = active, isConnected = true)
-                                else p.copy(isAudioActive = if (active) false else p.isAudioActive)
-                            }
-                        )
+                        state.copy(pairedPhones = applyPhoneStatusPush(state.pairedPhones, mac, active))
                     }
                     AegisLogger.i(TAG, "Hardware ACK Phone Audio Active: $mac -> $active")
                 }
@@ -2110,6 +2106,7 @@ class BleConnectionManager private constructor(private val appContext: Context) 
         _deviceState.update { it.copy(isMultipointOn = enabled) }
         sendCommand(QcyProtocol.createMultipointCommand(enabled))
         scheduleStateVerification(QcyProtocol.CMD_MULTIPOINT_CONTROL)
+        scheduleStateVerification(QcyProtocol.CMD_MULTIPOINT_CONTROL, delayMs = 3500L)
         com.aegissoft.qcybutmod.core.audio.AegisVoiceAssistant.getInstance(appContext)
             .announceFeature("Çift cihaz bağlantısı", enabled)
     }
@@ -2118,10 +2115,9 @@ class BleConnectionManager private constructor(private val appContext: Context) 
         // Resmi app requestPhoneInfo: FE+0x24 (multipoint durumu) VE FE+0x4D (liste) birlikte sorgulanır
         sendCommand(QcyProtocol.packFrame(QcyProtocol.CMD_REQUEST_ALL_DATA, QcyProtocol.CMD_MULTIPOINT_CONTROL))
         sendCommand(QcyProtocol.packFrame(QcyProtocol.CMD_REQUEST_ALL_DATA, QcyProtocol.CMD_MULTIPOINT_QUERY))
-        sendCommand(QcyProtocol.packFrame(QcyProtocol.CMD_REQUEST_ALL_DATA, QcyProtocol.CMD_PHONE_STATUS))
         // Canlı logta cihaz 0x4D'ye tek seferde cevap vermeyebiliyor → tek retry
         coroutineScope.launch {
-            delay(700)
+            delay(1200)
             if (_deviceState.value.isConnected) {
                 sendCommand(QcyProtocol.packFrame(QcyProtocol.CMD_REQUEST_ALL_DATA, QcyProtocol.CMD_MULTIPOINT_QUERY))
             }

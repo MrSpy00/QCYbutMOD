@@ -229,8 +229,8 @@ object QcyProtocol {
     }
 
     fun createMultipointCommand(enable: Boolean): ByteArray {
-        // Official melobuds_pro_19786_panel.json (cmdid=36): 1 = ON (FF03240101), 2 = OFF (FF03240102)
-        return packFrame(CMD_MULTIPOINT_CONTROL, if (enable) 0x01 else 0x02)
+        // Official PairPhoneConfigActivity:487 setSingleValue(cmdID, z ? 1 : 0) → 1 = ON (FF03240101), 0 = OFF (FF03240100)
+        return packFrame(CMD_MULTIPOINT_CONTROL, if (enable) 0x01 else 0x00)
     }
 
     /**

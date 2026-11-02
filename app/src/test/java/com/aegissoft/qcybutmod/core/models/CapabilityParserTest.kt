@@ -32,4 +32,12 @@ class CapabilityParserTest {
         val c = CapabilityParser.parse(1, mapOf("anc" to mapOf<Any, Any>(), "settings" to listOf(mapOf("name" to "Sleeping Mode", "cmdid" to 16))), false)
         assertFalse(c.hasMultipoint)
     }
+    @Test fun missingSettingsKeyKeepsMultipointOpen() {
+        val caps = CapabilityParser.parse(32884, mapOf("anc" to Any()), false) // settings anahtarı YOK
+        assertTrue(caps.hasMultipoint)
+    }
+    @Test fun settingsWithoutCmdid36DisablesMultipoint() {
+        val caps = CapabilityParser.parse(16849, mapOf("settings" to emptyList<Any>()), false)
+        assertFalse(caps.hasMultipoint)
+    }
 }

@@ -22,6 +22,7 @@ object CapabilityParser {
         else features["anc"] != null
         // Bilinmeyen cihazda varsayılan açık (MeloBuds Pro canlı test edildi); settings VERİLDİYSE cmdid 36 aranır
         val hasMultipoint = features == null ||
+            features["settings"] == null ||
             readSettings(features).any { cmdidOf(it) == 36 }
         val hasFind = features == null || features["find_earphone"] == true
         val events = (features?.get("key_function") as? Map<*, *>)?.get("events") as? List<*>

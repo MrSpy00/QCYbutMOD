@@ -63,6 +63,15 @@ class QcyProtocolTest {
     }
 
     @Test
+    fun multipointOffFrameMatchesOfficial() {
+        // resmi uygulama: PairPhoneConfigActivity :487 → FF 03 24 01 00
+        assertArrayEquals(
+            b(0xFF, 0x03, 0x24, 0x01, 0x00),
+            QcyProtocol.createMultipointCommand(false)
+        )
+    }
+
+    @Test
     fun phoneListResponseOneRecordParses() {
         // gerçek tek kayıt (parsePairPhoneList düzeni): [count=1, len, status=2, mac×6, 'T','e','s','t',0]
         val name = "Test".toByteArray(); val len = (1 + 6 + name.size + 1).toByte()
