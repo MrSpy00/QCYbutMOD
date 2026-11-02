@@ -18,6 +18,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.aegissoft.qcybutmod.core.bluetooth.BleConnectionManager
+import com.aegissoft.qcybutmod.core.models.ProductDatabase
 import com.aegissoft.qcybutmod.ui.components.AegisCard
 import com.aegissoft.qcybutmod.ui.theme.*
 
@@ -29,6 +30,9 @@ fun MultipointScreen(
     val state by bleManager.deviceState.collectAsState()
     val theme = LocalAppThemeColor.current
     val haptic = LocalHapticFeedback.current
+    val hasMultipoint = remember(state.vendorId) {
+        ProductDatabase.getCapabilities(state.vendorId).hasMultipoint
+    }
 
     LaunchedEffect(state.isConnected) {
         if (state.isConnected) {
@@ -111,7 +115,7 @@ fun MultipointScreen(
                     Spacer(modifier = Modifier.width(12.dp))
                     Switch(
                         checked = state.isMultipointOn,
-                        enabled = state.isConnected,
+                        enabled = state.isConnected && hasMultipoint,
                         onCheckedChange = { enabled ->
                             haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                             bleManager.setMultipoint(enabled)
@@ -120,6 +124,38 @@ fun MultipointScreen(
                             checkedThumbColor = OledBlack,
                             checkedTrackColor = theme.primary
                         )
+                    )
+                }
+            }
+        }
+
+        // Yetenek kapısı: model multipoint desteklemiyorsa açıklayıcı kart
+        if (!hasMultipoint) {
+            item {
+                AegisCard(
+                    modifier = Modifier.fillMaxWidth(),
+                    backgroundColor = DarkSurfaceVariant
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = Icons.Rounded.Info,
+                            contentDescription = null,
+                            tint = WarningAmber,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "Bu model çift cihaz bağlantı desteklemiyor",
+                            color = WarningAmber,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 13.sp
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = "Bu kulaklık modelinde çift cihaz (multipoint) bağlantısı donanım tarafından desteklenmiyor.",
+                        color = TextSecondary,
+                        fontSize = 11.sp
                     )
                 }
             }
@@ -201,10 +237,32 @@ fun MultipointScreen(
                         )
                         Spacer(modifier = Modifier.height(8.dp))
                         Text(
-                            text = "Kulaklıktan kayıtlı cihazlar sorgulanıyor...",
+                            text = "Eşleşen telefon bulunamadı",
                             color = TextSecondary,
                             fontSize = 12.sp
                         )
+                        Spacer(modifier = Modifier.height(10.dp))
+                        OutlinedButton(
+                            onClick = {
+                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                bleManager.refreshMultipointDevices()
+                            },
+                            shape = RoundedCornerShape(8.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Rounded.Refresh,
+                                contentDescription = null,
+                                tint = theme.primary,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = "Yenile",
+                                color = theme.primary,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
                     }
                 } else {
                     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {

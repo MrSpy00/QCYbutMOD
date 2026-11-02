@@ -469,6 +469,19 @@ object QcyProtocol {
         return list
     }
 
+    /**
+     * 0x4D telefon listesi yanıtını state güncelleme kuralıyla ayrıştırır:
+     * null = yanıt yok/geçersiz → state KORU; payload[0] (kayıt sayısı) == 0 →
+     * açık boş yanıt → listeyi TEMİZLE; dolu kayıt → liste.
+     */
+    fun parsePhoneListResponse(payload: ByteArray): List<ConnectedPhone>? {
+        if (payload.isEmpty()) return null
+        val parsed = parsePairPhoneList(payload)
+        if (parsed.isNotEmpty()) return parsed
+        // Boş parselenen yanıtta sayaç başlığı 0 değilse bozuk/eksik yanıt sayılır (state koru)
+        return if (payload[0] == 0.toByte()) emptyList() else null
+    }
+
     fun parsePhoneStatus(payload: ByteArray): Pair<String, Boolean>? {
         if (payload.size < 7) return null
         val macStr = String.format(

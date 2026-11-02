@@ -1,6 +1,9 @@
 package com.aegissoft.qcybutmod.core.bluetooth
 
 import org.junit.Assert.assertArrayEquals
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class QcyProtocolTest {
@@ -45,5 +48,26 @@ class QcyProtocolTest {
             b(0xFF, 0x03, 0xFE, 0x01, 0x1D),
             QcyProtocol.packFrame(QcyProtocol.CMD_REQUEST_ALL_DATA, 0x1D.toByte())
         )
+    }
+
+    @Test
+    fun phoneListResponseEmptyPayloadKeepsState() {
+        assertNull(QcyProtocol.parsePhoneListResponse(ByteArray(0)))
+    }
+
+    @Test
+    fun phoneListResponseCountZeroClears() {
+        // payload[0]=0 (kayıt sayısı) → açık boş yanıt
+        val r = QcyProtocol.parsePhoneListResponse(byteArrayOf(0))
+        assertTrue(r != null && r.isEmpty())
+    }
+
+    @Test
+    fun phoneListResponseOneRecordParses() {
+        // gerçek tek kayıt (parsePairPhoneList düzeni): [count=1, len, status=2, mac×6, 'T','e','s','t',0]
+        val name = "Test".toByteArray(); val len = (1 + 6 + name.size + 1).toByte()
+        val p = byteArrayOf(1, len, 2, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66) + name + 0
+        val r = QcyProtocol.parsePhoneListResponse(p)
+        assertEquals(1, r!!.size); assertEquals("Test", r[0].name)
     }
 }

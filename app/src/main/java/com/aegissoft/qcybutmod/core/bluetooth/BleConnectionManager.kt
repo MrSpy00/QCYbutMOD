@@ -1848,8 +1848,9 @@ class BleConnectionManager private constructor(private val appContext: Context) 
                 AegisLogger.i(TAG, "Hardware ACK Fit Test (0x%02X): left=${result.leftEarGoodSeal}, right=${result.rightEarGoodSeal}, completed=${result.isCompleted}".format(cmdId))
             }
             QcyProtocol.CMD_MULTIPOINT_QUERY -> {
-                val phones = QcyProtocol.parsePairPhoneList(payload)
-                if (phones.isNotEmpty()) {
+                // null → yanıt yok/geçersiz, mevcut liste korunur; boş liste → state temizlenir
+                val phones = QcyProtocol.parsePhoneListResponse(payload)
+                if (phones != null) {
                     _deviceState.update { it.copy(pairedPhones = phones) }
                     AegisLogger.i(TAG, "Hardware ACK Multipoint Paired Phones: ${phones.size}")
                 }
@@ -2047,8 +2048,17 @@ class BleConnectionManager private constructor(private val appContext: Context) 
     }
 
     fun refreshMultipointDevices() {
+        // Resmi app requestPhoneInfo: FE+0x24 (multipoint durumu) VE FE+0x4D (liste) birlikte sorgulanır
+        sendCommand(QcyProtocol.packFrame(QcyProtocol.CMD_REQUEST_ALL_DATA, QcyProtocol.CMD_MULTIPOINT_CONTROL))
         sendCommand(QcyProtocol.packFrame(QcyProtocol.CMD_REQUEST_ALL_DATA, QcyProtocol.CMD_MULTIPOINT_QUERY))
         sendCommand(QcyProtocol.packFrame(QcyProtocol.CMD_REQUEST_ALL_DATA, QcyProtocol.CMD_PHONE_STATUS))
+        // Canlı logta cihaz 0x4D'ye tek seferde cevap vermeyebiliyor → tek retry
+        coroutineScope.launch {
+            delay(700)
+            if (_deviceState.value.isConnected) {
+                sendCommand(QcyProtocol.packFrame(QcyProtocol.CMD_REQUEST_ALL_DATA, QcyProtocol.CMD_MULTIPOINT_QUERY))
+            }
+        }
     }
 
     fun setPhoneBtAction(connectPhone: Boolean, phoneMac: String, phoneName: String = "") {
