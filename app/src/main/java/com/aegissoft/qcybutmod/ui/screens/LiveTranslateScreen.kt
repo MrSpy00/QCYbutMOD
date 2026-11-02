@@ -18,6 +18,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.History
 import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -60,6 +61,12 @@ fun LiveTranslateScreen(
     var manualText by remember { mutableStateOf("") }
     var geminiApiKeyInput by remember { mutableStateOf(GeminiLiveEngine.getApiKey(context)) }
 
+    // Çeviri günlüğü geçmişi (History sheet) durumu
+    var showHistorySheet by remember { mutableStateOf(false) }
+    var historyQuery by remember { mutableStateOf("") }
+    var historySessions by remember { mutableStateOf<List<JournalSession>>(emptyList()) }
+    var historyResults by remember { mutableStateOf<List<Pair<JournalSession, TranscriptItem>>>(emptyList()) }
+
     // Newest transcript renders at the top - scroll back to top when a new one arrives
     LaunchedEffect(uiState.transcriptItems.size, uiState.currentPartialOriginal) {
         if (uiState.transcriptItems.isNotEmpty()) {
@@ -67,8 +74,21 @@ fun LiveTranslateScreen(
         }
     }
 
+    // Geçmiş sheet açıkken oturumları veya arama sonuçlarını yükle
+    LaunchedEffect(showHistorySheet, historyQuery) {
+        if (!showHistorySheet) return@LaunchedEffect
+        if (historyQuery.isBlank()) {
+            historyResults = emptyList()
+            historySessions = session.journal.load()
+        } else {
+            historySessions = emptyList()
+            historyResults = session.journal.search(historyQuery)
+        }
+    }
+
     DisposableEffect(Unit) {
         onDispose {
+            session.saveToJournalAsync()
             session.destroy()
         }
     }
@@ -121,6 +141,20 @@ fun LiveTranslateScreen(
                     }
 
                     IconButton(
+                        onClick = { showHistorySheet = true },
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(DarkSurfaceVariant)
+                            .size(40.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Outlined.History,
+                            contentDescription = "Geçmiş",
+                            tint = TextSecondary
+                        )
+                    }
+
+                    IconButton(
                         onClick = { showEngineDialog = true },
                         modifier = Modifier
                             .clip(RoundedCornerShape(12.dp))
@@ -142,7 +176,13 @@ fun LiveTranslateScreen(
                 audioRms = uiState.audioRms,
                 theme = theme,
                 onToggleListening = { session.toggleListening() },
-                onClearTranscripts = { session.clearTranscripts() },
+                onClearTranscripts = {
+                    // Temizlemeden ÖNCE günlüğe kaydet (sıra: kayıt → temizle)
+                    scope.launch {
+                        session.saveToJournal()
+                        session.clearTranscripts()
+                    }
+                },
                 onOpenManualInput = { showManualInputDialog = true }
             )
         }
@@ -334,6 +374,36 @@ fun LiveTranslateScreen(
                     session.processSpeechInput(manualText)
                     manualText = ""
                     showManualInputDialog = false
+                }
+            }
+        )
+    }
+
+    // Çeviri Günlüğü Geçmişi (History sheet)
+    if (showHistorySheet) {
+        val displayEntries: List<Pair<JournalSession, List<TranscriptItem>>> =
+            if (historyQuery.isBlank()) {
+                historySessions.map { it to it.items }
+            } else {
+                historyResults.groupBy({ it.first }, { it.second })
+                    .map { (journalSession, matched) -> journalSession to matched }
+            }
+
+        TranslateHistorySheet(
+            entries = displayEntries,
+            query = historyQuery,
+            theme = theme,
+            onQueryChange = { historyQuery = it },
+            onDismiss = { showHistorySheet = false },
+            onReplay = { session.replaySpeech(it) },
+            onDeleteSession = { sessionId ->
+                scope.launch {
+                    session.journal.deleteSession(sessionId)
+                    if (historyQuery.isBlank()) {
+                        historySessions = session.journal.load()
+                    } else {
+                        historyResults = session.journal.search(historyQuery)
+                    }
                 }
             }
         )
@@ -1317,6 +1387,210 @@ private fun ManualTextInputDialog(
                         Icon(Icons.Rounded.Send, contentDescription = null, modifier = Modifier.size(16.dp))
                         Spacer(modifier = Modifier.width(6.dp))
                         Text("Çevir & Oku", color = Color.White)
+                    }
+                }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun TranslateHistorySheet(
+    entries: List<Pair<JournalSession, List<TranscriptItem>>>,
+    query: String,
+    theme: AppThemeColor,
+    onQueryChange: (String) -> Unit,
+    onDismiss: () -> Unit,
+    onReplay: (TranscriptItem) -> Unit,
+    onDeleteSession: (String) -> Unit
+) {
+    val dateFormat = remember { SimpleDateFormat("dd MMM HH:mm", Locale.getDefault()) }
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        containerColor = DarkSurface
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp)
+                .padding(bottom = 20.dp)
+        ) {
+            // Header
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text(
+                    text = "Çeviri Geçmişi",
+                    color = TextPrimary,
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Bold
+                )
+                IconButton(onClick = onDismiss, modifier = Modifier.size(32.dp)) {
+                    Icon(
+                        imageVector = Icons.Rounded.Close,
+                        contentDescription = "Kapat",
+                        tint = TextSecondary
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // Arama alanı — dil seçim sheet'indeki arama deseninin aynısı
+            OutlinedTextField(
+                value = query,
+                onValueChange = onQueryChange,
+                placeholder = { Text("Geçmişte ara...", color = TextTertiary, fontSize = 13.sp) },
+                leadingIcon = {
+                    Icon(
+                        imageVector = Icons.Rounded.Search,
+                        contentDescription = null,
+                        tint = TextSecondary,
+                        modifier = Modifier.size(18.dp)
+                    )
+                },
+                trailingIcon = {
+                    if (query.isNotBlank()) {
+                        IconButton(onClick = { onQueryChange("") }) {
+                            Icon(Icons.Rounded.Clear, contentDescription = "Aramayı Temizle", tint = TextSecondary)
+                        }
+                    }
+                },
+                singleLine = true,
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = theme.primaryColor,
+                    unfocusedBorderColor = DarkBorder,
+                    focusedContainerColor = DarkSurfaceVariant,
+                    unfocusedContainerColor = DarkSurfaceVariant,
+                    focusedTextColor = TextPrimary,
+                    unfocusedTextColor = TextPrimary
+                ),
+                shape = RoundedCornerShape(12.dp),
+                modifier = Modifier.fillMaxWidth()
+            )
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = 520.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                if (entries.isEmpty()) {
+                    item {
+                        Text(
+                            text = if (query.isBlank()) "Henüz kayıtlı çeviri yok" else "Sonuç bulunamadı",
+                            color = TextTertiary,
+                            fontSize = 13.sp,
+                            modifier = Modifier.padding(vertical = 8.dp)
+                        )
+                    }
+                } else {
+                    items(entries) { (journalSession, sessionItems) ->
+                        HistorySessionCard(
+                            journalSession = journalSession,
+                            items = sessionItems,
+                            dateFormat = dateFormat,
+                            theme = theme,
+                            onReplay = onReplay,
+                            onDelete = { onDeleteSession(journalSession.sessionId) }
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+/** Geçmiş sheet içinde bir oturum kartı: tarih + öğe sayısı başlığı, önizleme satırları ve oturum silme. */
+@Composable
+private fun HistorySessionCard(
+    journalSession: JournalSession,
+    items: List<TranscriptItem>,
+    dateFormat: SimpleDateFormat,
+    theme: AppThemeColor,
+    onReplay: (TranscriptItem) -> Unit,
+    onDelete: () -> Unit
+) {
+    AegisCard {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(12.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text(
+                    text = "${dateFormat.format(Date(journalSession.startedAt))} · ${items.size} kayıt",
+                    color = TextTertiary,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.SemiBold
+                )
+                IconButton(
+                    onClick = onDelete,
+                    modifier = Modifier.size(28.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.DeleteOutline,
+                        contentDescription = "Oturumu Sil",
+                        tint = DangerRed,
+                        modifier = Modifier.size(15.dp)
+                    )
+                }
+            }
+
+            items.forEachIndexed { index, item ->
+                if (index > 0) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    HorizontalDivider(color = DarkBorder.copy(alpha = 0.5f), thickness = 0.5.dp)
+                    Spacer(modifier = Modifier.height(8.dp))
+                }
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = item.originalText,
+                            color = TextSecondary,
+                            fontSize = 13.sp,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
+                            lineHeight = 17.sp
+                        )
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = item.translatedText,
+                            color = TextPrimary,
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
+                            lineHeight = 18.sp
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(8.dp))
+                    IconButton(
+                        onClick = { onReplay(item) },
+                        modifier = Modifier.size(30.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.VolumeUp,
+                            contentDescription = "Seslendir",
+                            tint = theme.primaryColor,
+                            modifier = Modifier.size(16.dp)
+                        )
                     }
                 }
             }

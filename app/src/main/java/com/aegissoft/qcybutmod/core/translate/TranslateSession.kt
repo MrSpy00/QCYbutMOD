@@ -51,6 +51,10 @@ class TranslateSession(private val context: Context) {
         private const val TAG = "TranslateSession"
     }
 
+    val sessionId: String = UUID.randomUUID().toString()
+    val startedAt: Long = System.currentTimeMillis()
+    val journal: TranslateJournalStore = TranslateJournalStore.default(context)
+
     private val scope = CoroutineScope(Dispatchers.Main + Job())
     private val mlKitEngine = MlKitEngine()
     private val geminiEngine = GeminiLiveEngine(context)
@@ -202,6 +206,20 @@ class TranslateSession(private val context: Context) {
     fun setTranscriptRotate(rotate: Boolean) {
         VoiceSettings.setTranscriptRotate(context, rotate)
         _uiState.update { it.copy(transcriptRotate = rotate) }
+    }
+
+    /** Mevcut transkripti günlüğe yazar; boşsa dosyaya dokunmaz. */
+    suspend fun saveToJournal() {
+        journal.append(_uiState.value.transcriptItems, sessionId, startedAt)
+    }
+
+    /**
+     * Ekran DisposableEffect onDispose çağrısı içindir: rememberCoroutineScope
+     * kompozisyon dağılırken iptal edildiği için kayıt oturumun kendi scope'unda
+     * başlatılır (scope destroy() ile iptal edilmez).
+     */
+    fun saveToJournalAsync() {
+        scope.launch { saveToJournal() }
     }
 
     fun clearTranscripts() {
