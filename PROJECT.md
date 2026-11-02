@@ -79,9 +79,52 @@ Kullanıcı 12 maddelik yeni istek turu; tüm düzeltmeler canlı cihazda doğru
 10. **Ayarlar Donanım Bilgisi (bağlı değilken):** BLE GATT MAC satırı klasik MAC'e düşmüyorsa `--` gösterir (dup kalktı); firmware bilinmiyorsa `1.0.0` yerine `--` (model varsayılanı boşaltıldı). Canlı doğrulandı.
 11. **Canlı Çeviri Dil Kartları Simetrisi:** "Hedef Dil (Kulaklık)" 2 satıra sarılıp bayrakları kaydırıyordu → "Hedef Dil"; iki kart tam hizalı (canlı dump: 512/512).
 
-## 7. Bilinen Sınırlar / Geri Dönüş Kalemi
+## 7. Yeni Özellikler & Hata Düzeltme Turu — Task 1–11 (2026-11-02)
+Plan: `.superpowers/sdd/qcybutmod-yeni-zellikler-hata--2026-11-02-approved/` (12 görev; bu bölüm Task 1-11 kodunu, §8 ise Task 12 limit/test kaydını belgeler). Doğrulama: **49 JVM testi yeşil (10 suite, 0 hata) + `assembleDebug` BUILD SUCCESSFUL**.
+
+### Yeni Özellikler
+1. **Çeviri Günlüğü:** `TranslateJournalStore` kalıcı oturum dosyaları (50 oturum cap, en eskisi düşer) + `LiveTranslateScreen` Geçmiş sheet: büyük/küçük harf duyarsız arama (oturumlar arası), tekil oturum silme, en yeni en üstte.
+2. **Gürültü Göstergesi:** `NoiseMonitor` canlı dB + 10 saniyelik geçmiş grafiği. Firmware ANC-mic ham akışını BLE'ye açmaz → ölçüm telefon mikrofonuyla yaklaşık (§8-a).
+3. **Bulma Paternleri:** Sürekli / İkili / Üçlü desen seçimi; `CapabilityParser.hasFind` yetenek kapısı ile (`find_earphone` yoksa segment gösterilmiyor).
+4. **Firmware Delta → Panel JSON Yenileme:** firmware sürümü değişince (`BleConnectionManager` firmware delta takibi) `PanelRepository` sürüm-lü panel cache'i (`panel_19786_vX.json`) düşer ve `panel_19786.json` otomatik yeniden fetch edilir; Ayarlar'da durum satırı gösterilir.
+5. **Yetenek Tespiti (N20 / H4):** `CapabilityParser.parse(vendorId, features, ldacSupported)` — N20 (32884) tam yetenek seti; H4 (16849/16850) sağ-only dokunma + LDAC; `key_function.events`'ten uzun basma, `settings` cmdid 36'dan multipoint, `eq.bands` sayısından EQ segmentleri.
+6. **Kadın/Erkek Ses Seçimi + Ayar Kartı Restyle:** `VoiceSettings.voice_gender` (`female` varsayılan / `male`) → `VoiceGenderResolver` (voice pick + pitch); ayarlar kartı görsel yenileme.
+
+### Hata Düzeltmeleri
+1. **FE Bulk Prompt-Mute Açığı:** `PromptMutePolicy.shouldRemute` — aegis/kapalı ses kaynağındayken firmware'e giden FE ses-seviye yazması bip sesini diriltirse otomatik yeniden susturur (`firmware_en` modunda asla susturmaz); 2 sn debounce yankı fırtınasını keser (`BleConnectionManager` 0x1D handler'ı ile entegre).
+2. **ANC Stale-Echo Guard:** `AncEchoGuard` — gönderilen `0x17` ANC komutunun dup/eski yankısı (stale status) uygulamayı yanlış moda çekmesin; 2.5 sn pencere, eşleşen yankı kabulü ve bekleyen temizliği.
+3. **Multipoint Empty-List / Tazeleme:** FE+24 (liste sorgusu) / 4D (yanıt) / 4F (tazeleme) hattı — `QcyProtocol.parsePhoneListResponse`: boş payload durumu korur (state ezmez), `count=0` açık boş yanıtla listeyi temizler; `MultipointScreen` refresh akışı bu yanıtlarla beslenir.
+4. **Fit Test Sahte Geçiş Kaldırıldı:** `FitTestManager` eşik aşılmadan "Geçti" vermeyi kesti; artık gerçek ölçüm sonucu döner (uydurma geçiş yok).
+5. **Uzun Basma 2 sn Dönüşü:** §6-8'de panel JSON'da event bulunmadığı için kaldırılan L7/R8 satırı, 0x2B canlı kanıtı (`key_function` tablosu 7/8 anahtarları) ve `hasLongPress` yetenek kapısıyla "Uzun Basma (2 sn)" olarak geri alındı (`GestureScreen`, keyId 7/8).
+
+## 8. Bilinen Sınırlar / Geri Dönüş Kalemi
 - Kutu (case) seviyesi: ham bayt her zaman `0x00` → `--` (firmware kutudayken okumuyor; kullanıcı onayıyla `0%` gösterilebilir).
 - TTS duyulabilirlik (Türkçe tek ses + pil okuması) ve bildirim gölgesi görsel teyidi kullanıcı tarafında.
 - Bağlı değilken seyrek `0x23` TX denemesi (zararsız, uyarı loglanıyor) — kök henüz izlenmedi.
 - İki adet aynı model çifti listede birleşir (isim-bazlı dedup); gerekirse seri-no dedup'a geç.
 - **Kulaklık LE-reklamı kapalıyken** (#5 jest e2e, #6 multipoint canlı toggle, #8 otomatik bağlanma, bağlı-yken ekran görüntüleri) uçtan uca test bloke — kullanıcı kulaklığı kutudan çıkarıp uyandırmalı; uygulama tarafı hazır (kalıcı tarama + beacon'da anında bağlanma).
+- **(a) Gürültü ölçümü yaklaşık:** firmware ANC-mic ham akışını BLE'ye açmaz; `NoiseMonitor` gösterge telefon mikrofonuyla **yaklaşık** ölçer (yönlü/gürültü göstergesi amaçlı, kalibre cihaz değeri değil).
+- **(b) `touchSides` H4 override sabit:** `CapabilityParser.rightTouchOnlyVendorIds = {16849, 16850}` — `products.json` yan (touch side) bilgisi taşımadığı için sabit kodlanmış override (`DeviceCapabilities.kt` shortcut yorumu); panel JSON yan verisi entegre edilene kadar geçerli.
+- **(c) Canlı cihaz doğrulaması ertelendi:** Task 1-11 canlı cihaz kontrolleri bu turda ADB bağlıyken yapılamadı; doğrulama JVM testleri + derleme ile tamamlandı (aşağıdaki canlı kontrol listesi bekliyor).
+
+### Doğrulama Test Listesi (Task 12 kaydı)
+**JVM Unit Testleri — 49 test / 10 suite, 0 hata (2026-11-02, `:app:testDebugUnitTest` yeşil):**
+| Suite | Adet | Görev |
+| :--- | :--- | :--- |
+| `PromptMutePolicyTest` | 6 | FE bulk prompt-mute (Task 2) |
+| `AncEchoGuardTest` | 4 | ANC stale-echo guard (Task 3) |
+| `QcyProtocolTest` | 7 | `parsePhoneListResponse` FE+24/4D/4F (3 test, Task 5) + ton sesi |
+| `TranslateJournalStoreTest` | 7 | Çeviri günlüğü roundtrip/arama/silme/cap (Task 9) |
+| `CapabilityParserTest` | 5 | N20/H4 yetenek tespiti (Task 4) |
+| `BatteryTrackerTest` | 8 | Pil doğruluk hattı (§4) |
+| `BleAdvertisementParserTest` | 2 | Beacon ayrıştırma (§5) |
+| `NoiseMonitorTest` | 4 | Gürültü göstergesi (Task 10) |
+| `VoiceGenderResolverTest` | 4 | Kadın/erkek ses seçimi (Task 1) |
+| `PanelCacheNamingTest` | 2 | Panel cache adlandırma (Task 11) |
+
+**Cihazda (ADB) yapılacak canlı kontroller — bekliyor:**
+1. FE+24/4D/4F multipoint liste burst (boş-liste koruma + refresh).
+2. Uzun basma L7/R8 2 sn yazımı ve firmware'den geri okuma.
+3. Panel JSON fetch (firmware delta → otomatik yenileme).
+4. Fit test gerçek sonuç (sahte geçiş yok teyidi).
+5. Prompt re-mute (FE ses-seviye yazınca firmware bip'inin otomatik susması).
