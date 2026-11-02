@@ -95,7 +95,7 @@ Plan: `.superpowers/sdd/qcybutmod-yeni-zellikler-hata--2026-11-02-approved/` (12
 2. **ANC Stale-Echo Guard:** `AncEchoGuard` — gönderilen `0x17` ANC komutunun dup/eski yankısı (stale status) uygulamayı yanlış moda çekmesin; 2.5 sn pencere, eşleşen yankı kabulü ve bekleyen temizliği.
 3. **Multipoint Empty-List / Tazeleme:** FE+24 (liste sorgusu) / 4D (yanıt) / 4F (tazeleme) hattı — `QcyProtocol.parsePhoneListResponse`: boş payload durumu korur (state ezmez), `count=0` açık boş yanıtla listeyi temizler; `MultipointScreen` refresh akışı bu yanıtlarla beslenir.
 4. **Fit Test Sahte Geçiş Kaldırıldı:** `FitTestManager` eşik aşılmadan "Geçti" vermeyi kesti; artık gerçek ölçüm sonucu döner (uydurma geçiş yok).
-5. **Uzun Basma 2 sn Dönüşü:** §6-8'de panel JSON'da event bulunmadığı için kaldırılan L7/R8 satırı, 0x2B canlı kanıtı (`key_function` tablosu 7/8 anahtarları) ve `hasLongPress` yetenek kapısıyla "Uzun Basma (2 sn)" olarak geri alındı (`GestureScreen`, keyId 7/8).
+5. **Uzun Basma 2 sn Dönüşü:** §6-8'de panel JSON'da event bulunmadığı için kaldırılan L7/R8 satırı, 0x2B canlı kanıtı (`key_function` tablosu 7/8 anahtarları) ve `hasLongPress` yetenek kapısıyla "Uzun Basma (2 sn)" olarak geri alındı (`GestureScreen`, keyId 7/8). 19786'da `hasLongPress` gate kapalı kalır: `products.json`'da Long press yok (`key_function.events` "Long press" içermiyor) → satırlar görünmez. Satırlar yalnız `key_function` olayında "Long press" olan modellerde (ör. 23872-23879) ve `key_function`'ı olmayan modellerde (`events == null`) görünür.
 
 ## 8. Bilinen Sınırlar / Geri Dönüş Kalemi
 - Kutu (case) seviyesi: ham bayt her zaman `0x00` → `--` (firmware kutudayken okumuyor; kullanıcı onayıyla `0%` gösterilebilir).

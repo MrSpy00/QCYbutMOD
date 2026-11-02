@@ -75,26 +75,7 @@ class AegisVoiceAssistant private constructor(private val context: Context) : Te
             } else {
                 // Pick the best available Turkish voice (highest quality = natural Google voices);
                 // speakTranslation re-applies it for tr targets since setting language resets voice.
-                try {
-                    val trVoices = tts?.voices?.filter { it.locale.language == "tr" } ?: emptyList()
-                    val gender = VoiceSettings.getVoiceGender(context)
-                    val pickedName = VoiceGenderResolver.pickVoiceName(
-                        trVoices.map { VoiceInfo(it.name, it.quality) },
-                        gender
-                    )
-                    // null (empty/no match) keeps the legacy max-quality fallback
-                    val best = trVoices.firstOrNull { it.name == pickedName }
-                        ?: trVoices.maxByOrNull { it.quality }
-                    if (best != null) {
-                        tts?.voice = best
-                        trSelectedVoice = best
-                        Log.i(TAG, "Turkish voice selected: ${best.name} quality=${best.quality} network=${best.isNetworkConnectionRequired}")
-                    } else {
-                        Log.i(TAG, "No explicit Turkish voice exposed by engine, keeping language default")
-                    }
-                } catch (e: Exception) {
-                    Log.w(TAG, "Turkish voice selection failed", e)
-                }
+                selectTurkishVoice()
             }
             applySpeechSettings()
             tts?.setAudioAttributes(speechAudioAttributes)
@@ -133,6 +114,32 @@ class AegisVoiceAssistant private constructor(private val context: Context) : Te
         val rate = VoiceSettings.getTtsRate(context)
         tts?.setSpeechRate(rate)
         tts?.setPitch(VoiceGenderResolver.pitchFor(VoiceSettings.getVoiceGender(context)))
+        // Cinsiyet değişince ses restart beklemeden yeniden hedeflenir (idempotent)
+        selectTurkishVoice()
+    }
+
+    /** Türkçe ses seçimi: onInit ve cinsiyet değişiminde aynı yerden çalışır, tekrar çağırmak güvenli. */
+    private fun selectTurkishVoice() {
+        try {
+            val trVoices = tts?.voices?.filter { it.locale.language == "tr" } ?: emptyList()
+            val gender = VoiceSettings.getVoiceGender(context)
+            val pickedName = VoiceGenderResolver.pickVoiceName(
+                trVoices.map { VoiceInfo(it.name, it.quality) },
+                gender
+            )
+            // null (empty/no match) keeps the legacy max-quality fallback
+            val best = trVoices.firstOrNull { it.name == pickedName }
+                ?: trVoices.maxByOrNull { it.quality }
+            if (best != null) {
+                tts?.voice = best
+                trSelectedVoice = best
+                Log.i(TAG, "Turkish voice selected: ${best.name} quality=${best.quality} network=${best.isNetworkConnectionRequired}")
+            } else {
+                Log.i(TAG, "No explicit Turkish voice exposed by engine, keeping language default")
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "Turkish voice selection failed", e)
+        }
     }
 
     private fun requestFocus() {

@@ -473,9 +473,10 @@ fun HomeScreen(
                     )
                     Spacer(modifier = Modifier.height(6.dp))
                     Text(
-                        text = String.format("%.1f dB", noiseDb.toDouble()),
-                        color = theme.primary,
-                        fontSize = 34.sp,
+                        text = if (hasMicPermission) String.format("%.1f dB", noiseDb.toDouble())
+                        else "Mikrofon izni verilmedi",
+                        color = if (hasMicPermission) theme.primary else TextTertiary,
+                        fontSize = if (hasMicPermission) 34.sp else 16.sp,
                         fontWeight = FontWeight.Black
                     )
                     Spacer(modifier = Modifier.height(2.dp))

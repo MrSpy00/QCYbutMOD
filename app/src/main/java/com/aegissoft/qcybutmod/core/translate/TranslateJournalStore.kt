@@ -87,8 +87,13 @@ class TranslateJournalStore(private val dir: File) {
 
     // shortcut: doğrudan yerinde yazım — süreç ölümü anında dosya yarım kalırsa load()
     // boş döner; upgrade gerekiyorsa yaz-sonra-rename (tmp dosya + atomicMove) kullan.
+    // Yazım hatası (disk dolu vb.) günlük kaydını düşürür, uygulamayı düşürmez.
     private fun writeAll(sessions: List<JournalSession>) {
-        dir.mkdirs()
-        file.writeText(gson.toJson(sessions, listType))
+        try {
+            dir.mkdirs()
+            file.writeText(gson.toJson(sessions, listType))
+        } catch (e: Exception) {
+            Log.e(TAG, "Journal dosyasına yazılamadı", e)
+        }
     }
 }

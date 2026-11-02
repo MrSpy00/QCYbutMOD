@@ -858,7 +858,7 @@ fun SettingsScreen(
             }
             AegisCard(modifier = Modifier.fillMaxWidth()) {
                 Text(
-                    text = "Panel JSON: ${state.vendorId} • ${state.firmwareVersion.ifEmpty { "--" }} • $panelStatusText",
+                    text = "Panel JSON: ${if (state.vendorId == 0) "--" else state.vendorId} • ${state.firmwareVersion.ifEmpty { "--" }} • $panelStatusText",
                     color = TextSecondary,
                     fontSize = 12.sp
                 )

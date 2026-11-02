@@ -24,6 +24,7 @@ import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.*
 import java.util.UUID
+import java.util.concurrent.ConcurrentHashMap
 import kotlin.math.roundToInt
 
 @SuppressLint("MissingPermission")
@@ -1233,7 +1234,9 @@ class BleConnectionManager private constructor(private val appContext: Context) 
 
     // cmdId bazlı doğrulama job'ları: aynı cmdId yeniden planlanınca SADECE kendi job'ı
     // iptal edilir, farklı cmdId'lerin bekleyen doğrulamaları çakışmaz.
-    private val verifyJobs = mutableMapOf<Byte, Job>()
+    // Ana thread (setAnc/setGameMode/setMultipoint) ve Binder GATT thread'i (processQcyFrame)
+    // birlikte yazdığı için eşzamanlılık güvenli ConcurrentHashMap.
+    private val verifyJobs = ConcurrentHashMap<Byte, Job>()
 
     private fun scheduleStateVerification(vararg cmdIds: Byte, delayMs: Long = 650L) {
         cmdIds.forEach { cid ->
