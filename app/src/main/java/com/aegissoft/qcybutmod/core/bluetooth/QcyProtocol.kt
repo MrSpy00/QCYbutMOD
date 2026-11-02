@@ -602,8 +602,8 @@ object QcyProtocol {
             val l = payload[0].toInt() and 0xFF
             val r = payload[1].toInt() and 0xFF
             return FitTestResult(
-                leftEarGoodSeal = (l == 1 || l >= 2),
-                rightEarGoodSeal = (r == 1 || r >= 2),
+                leftEarGoodSeal = (l == 1),
+                rightEarGoodSeal = (r == 1),
                 isCompleted = true,
                 leftScore = l,
                 rightScore = r
@@ -612,8 +612,8 @@ object QcyProtocol {
         val status = payload.getOrNull(0)?.toInt() ?: 0
         val left = payload.getOrNull(1)?.toInt() ?: 0
         val right = payload.getOrNull(2)?.toInt() ?: 0
-        val isGoodLeft = left >= 1
-        val isGoodRight = right >= 1
+        val isGoodLeft = left == 1
+        val isGoodRight = right == 1
         return FitTestResult(
             leftEarGoodSeal = isGoodLeft,
             rightEarGoodSeal = isGoodRight,

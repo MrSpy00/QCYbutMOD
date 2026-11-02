@@ -1,5 +1,9 @@
 package com.aegissoft.qcybutmod.ui.screens
 
+import android.Manifest
+import android.content.pm.PackageManager
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -20,6 +24,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.ContextCompat
 import com.aegissoft.qcybutmod.core.audio.FitTestManager
 import com.aegissoft.qcybutmod.core.audio.FitTestState
 import com.aegissoft.qcybutmod.core.bluetooth.BleConnectionManager
@@ -35,6 +40,12 @@ fun FitTestScreen(
     val theme = LocalAppThemeColor.current
     val fitTestManager = remember { FitTestManager(context, bleManager) }
     val testState by fitTestManager.testState.collectAsState()
+
+    val micPermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) { perms ->
+        if (perms.values.all { it }) fitTestManager.startTest()
+    }
 
     DisposableEffect(Unit) {
         onDispose {
@@ -254,8 +265,13 @@ fun FitTestScreen(
             onClick = {
                 if (testState is FitTestState.InProgress) {
                     fitTestManager.cancelTest()
-                } else {
+                } else if (
+                    ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) ==
+                    PackageManager.PERMISSION_GRANTED
+                ) {
                     fitTestManager.startTest()
+                } else {
+                    micPermissionLauncher.launch(arrayOf(Manifest.permission.RECORD_AUDIO))
                 }
             },
             modifier = Modifier
