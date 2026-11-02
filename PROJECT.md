@@ -105,7 +105,7 @@ Plan: `.superpowers/sdd/qcybutmod-yeni-zellikler-hata--2026-11-02-approved/` (12
 - **Kulaklık LE-reklamı kapalıyken** (#5 jest e2e, #6 multipoint canlı toggle, #8 otomatik bağlanma, bağlı-yken ekran görüntüleri) uçtan uca test bloke — kullanıcı kulaklığı kutudan çıkarıp uyandırmalı; uygulama tarafı hazır (kalıcı tarama + beacon'da anında bağlanma).
 - **(a) Gürültü ölçümü yaklaşık:** firmware ANC-mic ham akışını BLE'ye açmaz; `NoiseMonitor` gösterge telefon mikrofonuyla **yaklaşık** ölçer (yönlü/gürültü göstergesi amaçlı, kalibre cihaz değeri değil).
 - **(b) `touchSides` H4 override sabit:** `CapabilityParser.rightTouchOnlyVendorIds = {16849, 16850}` — `products.json` yan (touch side) bilgisi taşımadığı için sabit kodlanmış override (`DeviceCapabilities.kt` shortcut yorumu); panel JSON yan verisi entegre edilene kadar geçerli.
-- **(c) Canlı cihaz doğrulaması ertelendi:** Task 1-11 canlı cihaz kontrolleri bu turda ADB bağlıyken yapılamadı; doğrulama JVM testleri + derleme ile tamamlandı (aşağıdaki canlı kontrol listesi bekliyor).
+- **(c) Canlı cihaz doğrulaması ADB ile yapıldı (2026-11-02 17:35-18:30):** Tüm canlı kontroller `ADB_LIVE_TEST_NOTES.md` dosyasında kanıt loglarıyla; yalnızca 2 madde kullanıcının fiziksel katılımını bekliyor (kulaklık takılı ANC tekrar testi, kadın/erkek sesinin kulakla doğrulanması).
 
 ### Doğrulama Test Listesi (Task 12 kaydı)
 **JVM Unit Testleri — 49 test / 10 suite, 0 hata (2026-11-02, `:app:testDebugUnitTest` yeşil):**
@@ -122,10 +122,13 @@ Plan: `.superpowers/sdd/qcybutmod-yeni-zellikler-hata--2026-11-02-approved/` (12
 | `VoiceGenderResolverTest` | 4 | Kadın/erkek ses seçimi (Task 1) |
 | `PanelCacheNamingTest` | 2 | Panel cache adlandırma (Task 11) |
 
-**Cihazda (ADB) yapılacak canlı kontroller — bekliyor:**
-1. FE+24/4D/4F multipoint liste burst (boş-liste koruma + refresh).
-2. Uzun basma L7/R8 2 sn yazımı ve firmware'den geri okuma.
-3. Panel JSON fetch (firmware delta → otomatik yenileme).
-4. Fit test gerçek sonuç (sahte geçiş yok teyidi).
-5. Prompt re-mute (FE ses-seviye yazınca firmware bip'inin otomatik susması).
-6. FindDeviceScreen kısa ekran taşma kontrolü (chips +44dp, park edilen T8 bulgusu).
+**Cihazda (ADB) yapılan canlı kontroller — 2026-11-02, kanıtlar `ADB_LIVE_TEST_NOTES.md`:**
+1. **✅** FE+24/4D/4F burst gönderildi; **0x24'e firmware cevap veriyor** (`[01]`/`[00]` okuma çalışır); 0x4D/0x4F'e sessiz → boş-liste koruma + seed/boş-durum UI doğru davrandı.
+2. **✅** Uzun basma L7/R8: 19786'da `hasLongPress=false` → satır gizli (beklenen, §7-5); jest atama yolu canlı → `0000000D` write `keyId=5,funcId=3` ACK + 415ms readback `5=3` ✓.
+3. **✅** Panel JSON fetch: char-read hook fix'iyle `panel_19786_v2.0.6.json` canlı indirildi, Settings satırı `Ok`.
+4. **✅** Fit test: sonuç RX'i gelmedi → sahte geçiş yok, dürüst Failed (eski battery-heuristic yok).
+5. **✅** Prompt re-mute: her connect'te `FF 04 1D 02 00 00` (5+ kez canlı).
+6. **✅** FindDevice kısa ekran: 1280x2800'de clip yok; İkili patern burst zamanlaması 400/300ms tam.
+7. **✅ (bonus, yeni fix'ler canlı doğrulandı):** auto-reconnect (0x24 write → link drop ×4 → 2sn'de 1/5 ile geri dönüş; "Bağlantıyı Kes" negatif testi sessiz), ANC stale-echo guard (5 yankı bastırıldı, UI sabit), çeviri günlüğü persist+arama, notify-heal CCCD resubscribe, kadın/erkek chips crash'siz.
+
+**Kullanıcı katılımını bekleyen:** (i) ANC/şeffaf mod tekrar testi — **kulaklıklar kulaktayken** (kutudayken firmware 0x17 state okuması hep `[02 00 00]` döndü); (ii) ses cinsinin (Kadın/Erkek) kulakla doğrulanması.
