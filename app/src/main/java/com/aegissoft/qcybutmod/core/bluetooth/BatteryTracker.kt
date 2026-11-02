@@ -63,8 +63,6 @@ class BatteryTracker {
             isLeftCharging = chg
             rightLevel = valid
             isRightCharging = chg
-            caseLevel = -1
-            isCaseCharging = false
             AegisLogger.d(TAG, "GATT 1-byte battery: lvl=$valid%, charging=$chg")
             return currentBattery
         }

@@ -155,4 +155,11 @@ class BatteryTrackerTest {
         tracker.onGattRaw(byteArrayOf(0x00, 0x00, 0x64))
         assertTrue(tracker.currentBattery.hasValidBattery)
     }
+
+    @Test
+    fun testCaseSurvives1ByteGattPayload() {
+        tracker.onGattRaw(byteArrayOf(0x23, 0x45, 0x64)) // case = 100%
+        tracker.onGattRaw(byteArrayOf(0x80.toByte()))     // 1-byte frame: case hakkında bilgi taşımaz
+        assertEquals(100, tracker.currentBattery.caseLevel)
+    }
 }
