@@ -129,4 +129,30 @@ class BatteryTrackerTest {
         assertEquals(-1, resetBatt.systemLevel)
         assertFalse(resetBatt.hasValidBattery)
     }
+
+    @Test
+    fun testCaseLevelSurvivesZeroGattCaseByte() {
+        tracker.onGattRaw(byteArrayOf(0x23, 0x45, 0x64))       // case 100 biliniyor
+        val updated = tracker.onGattRaw(byteArrayOf(0x23, 0x45, 0x00)) // 0x00 = bilinmiyor → SİLME
+        assertEquals(100, updated.caseLevel)
+    }
+
+    @Test
+    fun testChargingBitKeptWhenLevelInvalid() {
+        val batt = tracker.onGattRaw(byteArrayOf(0x80.toByte(), 0x45, 0x00))
+        assertEquals(-1, batt.leftLevel)       // lvl 0 → geçersiz
+        assertTrue(batt.isLeftCharging)        // şarj biti korunur
+    }
+
+    @Test
+    fun testBeaconCase101NormalizesTo100() {
+        val batt = tracker.onBeacon(QcyBatteryInfo(leftLevel = 80, rightLevel = 80, caseLevel = 101))
+        assertEquals(100, batt.caseLevel)
+    }
+
+    @Test
+    fun testCaseOnlyCountsAsValidBattery() {
+        tracker.onGattRaw(byteArrayOf(0x00, 0x00, 0x64))
+        assertTrue(tracker.currentBattery.hasValidBattery)
+    }
 }

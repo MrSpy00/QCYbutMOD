@@ -10,7 +10,7 @@ data class QcyBatteryInfo(
     val systemLevel: Int = -1
 ) {
     val hasValidBattery: Boolean
-        get() = leftLevel in 0..100 || rightLevel in 0..100 || systemLevel in 0..100
+        get() = leftLevel in 0..100 || rightLevel in 0..100 || caseLevel in 0..100 || systemLevel in 0..100
 }
 
 enum class AncMode(val id: Int, val title: String) {

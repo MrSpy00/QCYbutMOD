@@ -730,6 +730,12 @@ fun SettingsScreen(
                         Text(text = "Anlık Pil Seviyeleri", color = TextSecondary, fontSize = 12.sp)
                         Text(text = battStr, color = if (state.isConnected) SuccessGreen else TextTertiary, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
                     }
+                    if (state.battery.systemLevel in 1..100) {
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                            Text(text = "Sistem (HFP)", color = TextSecondary, fontSize = 12.sp)
+                            Text(text = "${state.battery.systemLevel}%", color = TextPrimary, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                        }
+                    }
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                         Text(text = "Sinyal Şiddeti (RSSI)", color = TextSecondary, fontSize = 12.sp)
                         Text(text = rssiStr, color = if (state.isConnected) theme.primary else DangerRed, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)

@@ -1470,15 +1470,17 @@ class BleConnectionManager private constructor(private val appContext: Context) 
                 BluetoothProfile.STATE_DISCONNECTED -> {
                     AegisLogger.w(TAG, "GATT Disconnected (status: $status)")
                     closeCurrentGatt()
+                    batteryTracker.reset()
                     _deviceState.update {
                         it.copy(
                             isConnected = false,
                             isConnecting = false,
                             connectingAddress = "",
-                            battery = QcyBatteryInfo(leftLevel = -1, rightLevel = -1, caseLevel = -1),
+                            battery = batteryTracker.currentBattery,
                             rssi = -100
                         )
                     }
+                    publishBattery(batteryTracker.currentBattery)
                     if (userRequestedDisconnect) {
                         userRequestedDisconnect = false
                     } else {

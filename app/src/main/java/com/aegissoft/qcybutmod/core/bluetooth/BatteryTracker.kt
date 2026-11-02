@@ -46,7 +46,7 @@ class BatteryTracker {
      * Format:
      * - Byte 0: Left Earbud (bit 7 = charging, bits 0-6 = percent). 0 => absent / in case / unavailable (-1).
      * - Byte 1: Right Earbud (bit 7 = charging, bits 0-6 = percent). 0 => absent / in case / unavailable (-1).
-     * - Byte 2: Charging Case (bit 7 = charging, bits 0-6 = percent). 0 => absent / lid closed (-1).
+     * - Byte 2: Charging Case (bit 7 = charging, bits 0-6 = percent). 0 => unknown/lid closed → keep last known level.
      */
     @Synchronized
     fun onGattRaw(raw: ByteArray): QcyBatteryInfo {
@@ -60,9 +60,9 @@ class BatteryTracker {
             val lvl = b0 and 0x7F
             val valid = if (lvl in 1..100) lvl else -1
             leftLevel = valid
-            isLeftCharging = chg && valid != -1
+            isLeftCharging = chg
             rightLevel = valid
-            isRightCharging = chg && valid != -1
+            isRightCharging = chg
             caseLevel = -1
             isCaseCharging = false
             AegisLogger.d(TAG, "GATT 1-byte battery: lvl=$valid%, charging=$chg")
@@ -81,7 +81,7 @@ class BatteryTracker {
             leftVal == 101 -> 100
             else -> -1 // 0 means not active/in case/absent
         }
-        isLeftCharging = leftChg && leftLevel != -1
+        isLeftCharging = leftChg
 
         // Parse Right
         val rightChg = (bRight and 0x80) != 0
@@ -91,7 +91,7 @@ class BatteryTracker {
             rightVal == 101 -> 100
             else -> -1
         }
-        isRightCharging = rightChg && rightLevel != -1
+        isRightCharging = rightChg
 
         // Parse Case
         val caseChg = (bCase and 0x80) != 0
@@ -99,9 +99,9 @@ class BatteryTracker {
         caseLevel = when {
             caseVal in 1..100 -> caseVal
             caseVal == 101 -> 100
-            else -> -1
+            else -> caseLevel
         }
-        isCaseCharging = caseChg && caseLevel != -1
+        isCaseCharging = caseChg
 
         AegisLogger.i(TAG, "GATT Authoritative Battery: L=${leftLevel}% R=${rightLevel}% Case=${caseLevel}% (sys=${systemLevel}%)")
         return currentBattery
@@ -117,24 +117,24 @@ class BatteryTracker {
         if ((now - lastGattTimestamp) < GATT_FRESHNESS_WINDOW_MS && (leftLevel != -1 || rightLevel != -1)) {
             // Active GATT connection owns L/R; but GATT reports case=0x00 (lid closed/absent)
             // almost always — let the beacon fill in a case level GATT never provided.
-            if (caseLevel == -1 && beacon.caseLevel in 1..100) {
-                caseLevel = beacon.caseLevel
+            if (caseLevel == -1 && beacon.caseLevel in 1..101) {
+                caseLevel = minOf(beacon.caseLevel, 100)
                 isCaseCharging = beacon.isCaseCharging
                 AegisLogger.d(TAG, "Beacon case-level merged under fresh GATT state: Case=$caseLevel%")
             }
             return currentBattery
         }
 
-        if (beacon.leftLevel in 1..100) {
-            leftLevel = beacon.leftLevel
+        if (beacon.leftLevel in 1..101) {
+            leftLevel = minOf(beacon.leftLevel, 100)
             isLeftCharging = beacon.isLeftCharging
         }
-        if (beacon.rightLevel in 1..100) {
-            rightLevel = beacon.rightLevel
+        if (beacon.rightLevel in 1..101) {
+            rightLevel = minOf(beacon.rightLevel, 100)
             isRightCharging = beacon.isRightCharging
         }
-        if (beacon.caseLevel in 1..100) {
-            caseLevel = beacon.caseLevel
+        if (beacon.caseLevel in 1..101) {
+            caseLevel = minOf(beacon.caseLevel, 100)
             isCaseCharging = beacon.isCaseCharging
         }
 
