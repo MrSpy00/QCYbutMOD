@@ -97,6 +97,21 @@ Plan: `.superpowers/sdd/qcybutmod-yeni-zellikler-hata--2026-11-02-approved/` (12
 4. **Fit Test Sahte Geçiş Kaldırıldı:** `FitTestManager` eşik aşılmadan "Geçti" vermeyi kesti; artık gerçek ölçüm sonucu döner (uydurma geçiş yok).
 5. **Uzun Basma 2 sn Dönüşü:** §6-8'de panel JSON'da event bulunmadığı için kaldırılan L7/R8 satırı, 0x2B canlı kanıtı (`key_function` tablosu 7/8 anahtarları) ve `hasLongPress` yetenek kapısıyla "Uzun Basma (2 sn)" olarak geri alındı (`GestureScreen`, keyId 7/8). 19786'da `hasLongPress` gate kapalı kalır: `products.json`'da Long press yok (`key_function.events` "Long press" içermiyor) → satırlar görünmez. Satırlar yalnız `key_function` olayında "Long press" olan modellerde (ör. 23872-23879) ve `key_function`'ı olmayan modellerde (`events == null`) görünür.
 
+### Round-2 Hata Düzeltme Turu — Task 1–9 (2026-11-02 gece)
+Plan: `.superpowers/sdd/qcybutmod-hata-dzeltme-ve-kapa-2026-11-02-approved/` (9 görev; §9 bu turun Task 7 borders kaydıdır). Doğrulama: **70 JVM testi yeşil (12 suite, 0 hata) + `assembleDebug` BUILD SUCCESSFUL (HEAD `fa1d5dd`)**. Commit ledger (dosya:satır çapaları güncel HEAD):
+
+1. **`368c8de` — ANC stale-echo guard & legacy 0x0C drop:** `core/bluetooth/AncEchoGuard.kt:7` (2.5 sn pencere), `:14` (`onSent`), `:26-31` (`shouldApply` bekleyen yankı eşleşmesi); `core/bluetooth/BleConnectionManager.kt:1238` (guard örneği), `:1774` (0x17 uygulama kapısı), `:2021` (gönderim kaydı).
+2. **`3456daa` — Pil kutusu keep-last, ham şarj bitleri, systemLevel satırı:** `core/bluetooth/BatteryTracker.kt:49` (0x00 → bilinmiyor/kapalı keep-last kuralı), `:52` (`onGattRaw`), `:97-104` (kutu seviyesi koruma + otoriter log); `ui/screens/SettingsScreen.kt:753-756` (SystemLevel satırı).
+3. **`4d23b4e` — 1 baytlık GATT payload kutu seviyesini silmiyor:** `core/bluetooth/BatteryTracker.kt:97-100` (kısa payload'da `caseLevel` dokunulmaz).
+4. **`48e975a` — Multipoint resmi gate + baytlar, connect blast azaltma, phone status bilinmeyen cihaz ekleme:** `core/bluetooth/QcyProtocol.kt:67` (`CMD_MULTIPOINT_QUERY 0x4D`), `:231` (`createMultipointCommand`), `:477` (`parsePhoneListResponse`); `core/bluetooth/BleConnectionManager.kt:2111-2121` (`setMultipoint` / `refreshMultipointDevices` FE+0x24 ve FE+0x4D birlikte), `:1831-1832` (0x24 ACK), `:1927` (0x4D liste ACK); `core/bluetooth/PhoneStatusPush.kt:19` (`Bilinmeyen cihaz ($mac)` ekleme).
+5. **`b4ceb03` — Fit test resmi telefon-yanalı analizör, wav decode, mikrofon izin kapısı:** `core/audio/FitTestAnalyzer.kt:11` (analizör), `:17` (`analyze` PCM korelasyonu), `:53` (`decodeWavPcm16`); `ui/screens/FitTestScreen.kt:44-45,269-274` (`RECORD_AUDIO` izin kapısı).
+6. **`c1fcce5` — Fit test mikrofon yakalama çevresinde Bluetooth SCO:** `core/audio/FitTestManager.kt:171` (SCO kapatma), `:179-184` (`startSco`).
+7. **`1efe0d8` — Mute-first connect, debounce recheck, tone probe, sesli asistan jest kapısı:** `core/bluetooth/PromptMutePolicy.kt:11` (`shouldRemute`, 2 sn debounce); `core/bluetooth/BleConnectionManager.kt:1199-1204` (tone probe her 4. tick'te); `ui/screens/GestureScreen.kt:46-50` (`assistantAllowed` gate).
+8. **`d5a78df` — Kadın ses envanteri kontrolü + Ayarlar uyarısı, AegisLogger ses log'u:** `core/audio/AegisVoiceAssistant.kt:124` (`selectTurkishVoice`), `:131` (`Turkish voice inventory` log satırı), `:155` (`hasFemaleTurkishVoice`); `core/audio/VoiceGenderResolver.kt:14` (`isFemaleCoded`), `:18` (`pickVoiceName`), `:29` (`pitchFor`); `ui/screens/SettingsScreen.kt:491` (uyarı metni).
+9. **`5a72ec0` — Ses kaynak kartı sürekli dış hat, chip kenarlıkları, divider kalınlığı:** `ui/screens/SettingsScreen.kt:322` (kart `BorderStroke(1.dp, DarkBorder)`), `:466-486` (FilterChip kenarlıkları + şeffaf dolgu) — canlı ekran görüntüsü §9 ve §8-ADB listesinde erteli.
+10. **`7821a0e` — Runtime uzun basma satırları, capability-gate'li ANC/LDAC/EQ, bilinmeyen vendorId=0:** `core/models/DeviceCapabilities.kt:7-11` (hasAnc/hasLdac/hasMultipoint/hasFind/hasLongPress), `:21-27` (features tabanlı türetme); `ui/screens/HomeScreen.kt:519` (ANC kartı gate), `:789` (LDAC gate); `ui/screens/EqualizerScreen.kt:223` (EQ band gate, shortcut notu); `core/bluetooth/BleAdvertisementParser.kt:286` (`else -> 0` bilinmeyen vendorId).
+11. **`fa1d5dd` — Home EQ nav kartı yetenek bant sayısını gösteriyor:** `ui/screens/HomeScreen.kt:52` (`eqBands`), `:845` (`"$eqBands-Bant Parametrik Ekolayzer"` başlığı).
+
 ## 8. Bilinen Sınırlar / Geri Dönüş Kalemi
 - Kutu (case) seviyesi: ham bayt her zaman `0x00` → `--` (firmware kutudayken okumuyor; kullanıcı onayıyla `0%` gösterilebilir).
 - TTS duyulabilirlik (Türkçe tek ses + pil okuması) ve bildirim gölgesi görsel teyidi kullanıcı tarafında.
@@ -107,20 +122,27 @@ Plan: `.superpowers/sdd/qcybutmod-yeni-zellikler-hata--2026-11-02-approved/` (12
 - **(b) `touchSides` H4 override sabit:** `CapabilityParser.rightTouchOnlyVendorIds = {16849, 16850}` — `products.json` yan (touch side) bilgisi taşımadığı için sabit kodlanmış override (`DeviceCapabilities.kt` shortcut yorumu); panel JSON yan verisi entegre edilene kadar geçerli.
 - **(c) Canlı cihaz doğrulaması ADB ile yapıldı (2026-11-02 17:35-18:32):** Tüm canlı kontroller `ADB_LIVE_TEST_NOTES.md` dosyasında kanıt loglarıyla; yalnızca ses cinsinin (Kadın/Erkek) kulakla doğrulanması kullanıcının kulağına kaldı (ANC takılı tekrar testi 18:31'de kullanıcı canlı kullanarak kapattı).
 
+- **(d) Round-2 canlı ADB sahnesi (2026-11-02 23:34-23:52) — kısmen bloke, dürüst durum:** Yeni build kuruldu ve uygulama başlatıldı (`app-debug.apk`, HEAD `fa1d5dd`), `AegisLogger` dosyası (`filesDir/qcy_debug.log`) ADB ile çekildi. Kulaklıklar BLE reklamı YAYINLAMIYORDU: klasik bağlantı `cmd bluetooth_manager Disconnect` ile düşürüldükten sonra 5+ dakika tarama sonucu gelmedi; telefonun aktif ses cihazı REDMI Buds 8 Lite'tı ve `Hızlı Bağlan` log'u doğru şekilde `"Active audio device is not QCY (REDMI Buds 8 Lite) - scanning instead"` diyerek güvenli fallback'e düştü. Ekran o sırada insan kullanımındaydı (Galeri / WhatsApp çağrısı / Trendyol değişimi) — UI tap/enjeksiyonu 2'den fazla güvenilmez denemeden sonra atlandı. Sonuç: bu turda bağlanma bağımlı canlı kontroller çalıştırılamadı.
+- **(e) Round-2 ADB bekleyen kontroller (bağlantı + kullanıcı tarafı):** (1) kadın/erkek ses cinsinin kulakla doğrulanması — Google TTS Türkçe ses paketi indirildikten sonra; (2) multipoint OFF baytı `0x00` + `0x4D` liste canlı testi (bağlı kulaklıkla); (3) fit test `RECORD_AUDIO` canlı koşusu (kulaklıklar takılıyken); (4) borders ekran görüntüsü (T7, Ayarlar ekranı); (5) tone-probe log satırı kontrolü (bağlantı gerekli). Bunların hiçbiri sahte kaydedilmedi — yukarıdaki (d) maddesindeki engel nedeniyle bekliyor.
+- **(f) Round-2 pasif log kanıtları (önceki oturum, aynı turun build'i):** `Muted firmware voice prompt to 0 for AEGIS_TR` (20:38, T5 mute-first), `Hardware ACK Multipoint Switch: true` (20:38, T3), `GATT Authoritative Battery: L=16% R=-1% Case=-1% (sys=40%)` tekrarları (22:03, T2 keep-last), `Hardware ACK ANC (0x17)` yankıları + `Battery notified from 0008` (22:03, T1/T2). Tone probe TX cadencesi ve taze ANC toggle revert kontrolü bağlantı olmadan doğrulanamadı.
+- **(g) Yan etki kaydı:** Canlı sahnede aktif ses cihazı zorlaması için medya sesi toggle'ı (Ayarlar > QCY MeloBuds Pro) ve tüm bağlantıyı düşürme (`cmd bluetooth_manager Disconnect`) denendi; sonrasında aktif cihaz REDMI'ye döndü, profiller yeniden bağlandı. `svc power stayon true` geçici olarak açıldı ve sahne sonunda `false` ile geri alındı.
+
 ### Doğrulama Test Listesi (Task 12 kaydı)
-**JVM Unit Testleri — 49 test / 10 suite, 0 hata (2026-11-02, `:app:testDebugUnitTest` yeşil):**
+**JVM Unit Testleri — 70 test / 12 suite, 0 hata (2026-11-02 round-2 güncelleme, `:app:testDebugUnitTest` yeşil):**
 | Suite | Adet | Görev |
 | :--- | :--- | :--- |
-| `PromptMutePolicyTest` | 6 | FE bulk prompt-mute (Task 2) |
-| `AncEchoGuardTest` | 4 | ANC stale-echo guard (Task 3) |
-| `QcyProtocolTest` | 7 | `parsePhoneListResponse` FE+24/4D/4F (3 test, Task 5) + ton sesi |
+| `PromptMutePolicyTest` | 9 | FE bulk prompt-mute (Task 2) + mute-first/debounce (round-2) |
+| `AncEchoGuardTest` | 5 | ANC stale-echo guard (Task 3 + round-2 368c8de) |
+| `QcyProtocolTest` | 8 | `parsePhoneListResponse` FE+24/4D/4F (3 test, Task 5) + ton sesi + multipoint baytları (48e975a) |
 | `TranslateJournalStoreTest` | 7 | Çeviri günlüğü roundtrip/arama/silme/cap (Task 9) |
-| `CapabilityParserTest` | 5 | N20/H4 yetenek tespiti (Task 4) |
-| `BatteryTrackerTest` | 8 | Pil doğruluk hattı (§4) |
-| `BleAdvertisementParserTest` | 2 | Beacon ayrıştırma (§5) |
+| `CapabilityParserTest` | 8 | N20/H4 yetenek tespiti (Task 4) + round-2 gate testleri (48e975a, 7821a0e) |
+| `BatteryTrackerTest` | 13 | Pil doğruluk hattı (§4) + keep-last/1-bayt (3456daa, 4d23b4e) |
+| `BleAdvertisementParserTest` | 3 | Beacon ayrıştırma (§5) + bilinmeyen vendorId=0 (7821a0e) |
 | `NoiseMonitorTest` | 4 | Gürültü göstergesi (Task 10) |
-| `VoiceGenderResolverTest` | 4 | Kadın/erkek ses seçimi (Task 1) |
+| `VoiceGenderResolverTest` | 5 | Kadın/erkek ses seçimi (Task 1) + envanter (d5a78df) |
 | `PanelCacheNamingTest` | 2 | Panel cache adlandırma (Task 11) |
+| `FitTestAnalyzerTest` | 4 | Fit test analizör/wav decode (b4ceb03) |
+| `PhoneStatusPushTest` | 2 | Phone status bilinmeyen cihaz ekleme (48e975a) |
 
 **Cihazda (ADB) yapılan canlı kontroller — 2026-11-02, kanıtlar `ADB_LIVE_TEST_NOTES.md`:**
 1. **✅** FE+24/4D/4F burst gönderildi; **0x24'e firmware cevap veriyor** (`[01]`/`[00]` okuma çalışır); 0x4D/0x4F'e sessiz → boş-liste koruma + seed/boş-durum UI doğru davrandı.
