@@ -53,7 +53,7 @@ fun FindDeviceScreen(
         onDispose {
             patternJob?.cancel()
             bleManager.stopRssiPolling()
-            bleManager.triggerFindBeep(false, false)
+            bleManager.triggerFindBeep(false, false, sendFirmware = capabilities.hasFind)
         }
     }
 
@@ -80,16 +80,17 @@ fun FindDeviceScreen(
     fun runPattern(pattern: FindPattern, left: Boolean, right: Boolean) {
         patternJob?.cancel()
         patternJob = null
-        if (pattern == FindPattern.CONTINUOUS) {
-            bleManager.triggerFindBeep(left, right)
+        // hasFind yoksa firmware paterni de yok: yalnız yerel zil aç/kapa, 0x05/0x3F gönderilmez
+        if (!capabilities.hasFind || pattern == FindPattern.CONTINUOUS) {
+            bleManager.triggerFindBeep(left, right, sendFirmware = capabilities.hasFind)
             return
         }
         // Kesintisiz zil yok: patern her zaman sonunda stop ile biter
         patternJob = scope.launch {
             repeat(pattern.bursts) {
-                bleManager.triggerFindBeep(left, right)
+                bleManager.triggerFindBeep(left, right, sendFirmware = capabilities.hasFind)
                 delay(pattern.onMs)
-                bleManager.triggerFindBeep(false, false)
+                bleManager.triggerFindBeep(false, false, sendFirmware = capabilities.hasFind)
                 delay(pattern.offMs)
             }
             isLeftBeeping = false
@@ -105,7 +106,7 @@ fun FindDeviceScreen(
         } else {
             patternJob?.cancel()
             patternJob = null
-            bleManager.triggerFindBeep(false, false)
+            bleManager.triggerFindBeep(false, false, sendFirmware = capabilities.hasFind)
         }
     }
 
@@ -259,37 +260,36 @@ fun FindDeviceScreen(
             )
         }
 
-        // Firmware bulma (hasFind) yoksa bip kontrolleri gizlenir; radar + yerel kontroller kalır
-        if (capabilities.hasFind) {
-            Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(16.dp))
 
-            // Beep Trigger Buttons
-            AegisCard(modifier = Modifier.fillMaxWidth()) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        imageVector = Icons.Rounded.VolumeUp,
-                        contentDescription = null,
-                        tint = theme.primary,
-                        modifier = Modifier.size(20.dp)
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = "Yüksek Sesli Bip Alarmı",
-                        color = TextPrimary,
-                        fontSize = 15.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = "Kulaklık takılıyken alarmı açmayın, işitmeye zarar verebilir.",
-                    color = WarningAmber,
-                    fontSize = 11.sp
+        // Beep Trigger Buttons: hasFind false iken yalnız yerel zil (EarbudAudioLocator) kalır, firmware (0x05/0x3F) gönderilmez
+        AegisCard(modifier = Modifier.fillMaxWidth()) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    imageVector = Icons.Rounded.VolumeUp,
+                    contentDescription = null,
+                    tint = theme.primary,
+                    modifier = Modifier.size(20.dp)
                 )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = "Yüksek Sesli Bip Alarmı",
+                    color = TextPrimary,
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = "Kulaklık takılıyken alarmı açmayın, işitmeye zarar verebilir.",
+                color = WarningAmber,
+                fontSize = 11.sp
+            )
 
-                Spacer(modifier = Modifier.height(14.dp))
+            Spacer(modifier = Modifier.height(14.dp))
 
-                // Bulma paterni seçici: firmware zil + LED paterni
+            // Bulma paterni seçici (firmware zil + LED) yalnızca hasFind cihazlarda görünür
+            if (capabilities.hasFind) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -314,101 +314,101 @@ fun FindDeviceScreen(
                 }
 
                 Spacer(modifier = Modifier.height(10.dp))
+            }
 
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Button(
+                    onClick = { toggleBeep(!isLeftBeeping, isRightBeeping) },
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(46.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = if (isLeftBeeping) DangerRed else DarkSurfaceVariant
+                    ),
+                    shape = RoundedCornerShape(12.dp)
                 ) {
-                    Button(
-                        onClick = { toggleBeep(!isLeftBeeping, isRightBeeping) },
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(46.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = if (isLeftBeeping) DangerRed else DarkSurfaceVariant
-                        ),
-                        shape = RoundedCornerShape(12.dp)
-                    ) {
-                        Icon(
-                            imageVector = if (isLeftBeeping) Icons.Rounded.VolumeOff else Icons.Rounded.VolumeUp,
-                            contentDescription = null,
-                            tint = if (isLeftBeeping) Color.White else TextPrimary,
-                            modifier = Modifier.size(16.dp)
-                        )
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text(
-                            text = if (isLeftBeeping) "Sol Durdur" else "Sol Kulaklık",
-                            color = if (isLeftBeeping) Color.White else TextPrimary,
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.SemiBold
-                        )
-                    }
+                    Icon(
+                        imageVector = if (isLeftBeeping) Icons.Rounded.VolumeOff else Icons.Rounded.VolumeUp,
+                        contentDescription = null,
+                        tint = if (isLeftBeeping) Color.White else TextPrimary,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = if (isLeftBeeping) "Sol Durdur" else "Sol Kulaklık",
+                        color = if (isLeftBeeping) Color.White else TextPrimary,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
 
-                    Button(
-                        onClick = { toggleBeep(isLeftBeeping, !isRightBeeping) },
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(46.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = if (isRightBeeping) DangerRed else DarkSurfaceVariant
-                        ),
-                        shape = RoundedCornerShape(12.dp)
+                Button(
+                    onClick = { toggleBeep(isLeftBeeping, !isRightBeeping) },
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(46.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = if (isRightBeeping) DangerRed else DarkSurfaceVariant
+                    ),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Icon(
+                        imageVector = if (isRightBeeping) Icons.Rounded.VolumeOff else Icons.Rounded.VolumeUp,
+                        contentDescription = null,
+                        tint = if (isRightBeeping) Color.White else TextPrimary,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = if (isRightBeeping) "Sağ Durdur" else "Sağ Kulaklık",
+                        color = if (isRightBeeping) Color.White else TextPrimary,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
+            }
+
+            if (isLeftBeeping || isRightBeeping) {
+                val gainPct = (currentGain * 100).toInt()
+                Spacer(modifier = Modifier.height(10.dp))
+                Surface(
+                    shape = RoundedCornerShape(8.dp),
+                    color = theme.primary.copy(alpha = 0.15f),
+                    border = BorderStroke(1.dp, theme.primary.copy(alpha = 0.4f)),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Center
                     ) {
                         Icon(
-                            imageVector = if (isRightBeeping) Icons.Rounded.VolumeOff else Icons.Rounded.VolumeUp,
+                            imageVector = Icons.Rounded.VolumeUp,
                             contentDescription = null,
-                            tint = if (isRightBeeping) Color.White else TextPrimary,
-                            modifier = Modifier.size(16.dp)
+                            tint = theme.primary,
+                            modifier = Modifier.size(14.dp)
                         )
                         Spacer(modifier = Modifier.width(6.dp))
                         Text(
-                            text = if (isRightBeeping) "Sağ Durdur" else "Sağ Kulaklık",
-                            color = if (isRightBeeping) Color.White else TextPrimary,
-                            fontSize = 12.sp,
+                            text = "Kademeli Ses: %$gainPct ${if (gainPct >= 100) "(Maksimum Düzey)" else "(Kademeli Yükseliyor...)"}",
+                            color = theme.primary,
+                            fontSize = 11.sp,
                             fontWeight = FontWeight.SemiBold
                         )
                     }
                 }
-
-                if (isLeftBeeping || isRightBeeping) {
-                    val gainPct = (currentGain * 100).toInt()
-                    Spacer(modifier = Modifier.height(10.dp))
-                    Surface(
-                        shape = RoundedCornerShape(8.dp),
-                        color = theme.primary.copy(alpha = 0.15f),
-                        border = BorderStroke(1.dp, theme.primary.copy(alpha = 0.4f)),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.Center
-                        ) {
-                            Icon(
-                                imageVector = Icons.Rounded.VolumeUp,
-                                contentDescription = null,
-                                tint = theme.primary,
-                                modifier = Modifier.size(14.dp)
-                            )
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text(
-                                text = "Kademeli Ses: %$gainPct ${if (gainPct >= 100) "(Maksimum Düzey)" else "(Kademeli Yükseliyor...)"}",
-                                color = theme.primary,
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.SemiBold
-                            )
-                        }
-                    }
-                    Spacer(modifier = Modifier.height(8.dp))
-                    OutlinedButton(
-                        onClick = { toggleBeep(false, false) },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(42.dp),
-                        shape = RoundedCornerShape(12.dp)
-                    ) {
-                        Text(text = "Tüm Alarmları Sustur", color = DangerRed, fontSize = 12.sp)
-                    }
+                Spacer(modifier = Modifier.height(8.dp))
+                OutlinedButton(
+                    onClick = { toggleBeep(false, false) },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(42.dp),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Text(text = "Tüm Alarmları Sustur", color = DangerRed, fontSize = 12.sp)
                 }
             }
         }

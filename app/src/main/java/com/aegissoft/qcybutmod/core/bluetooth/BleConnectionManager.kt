@@ -2116,15 +2116,18 @@ class BleConnectionManager private constructor(private val appContext: Context) 
         scheduleStateVerification(QcyProtocol.CMD_TONE_VOLUME)
     }
 
-    fun triggerFindBeep(left: Boolean, right: Boolean) {
+    fun triggerFindBeep(left: Boolean, right: Boolean, sendFirmware: Boolean = true) {
         val start = left || right
         if (start) {
             com.aegissoft.qcybutmod.core.audio.EarbudAudioLocator.startBeep(left, right, appContext)
         } else {
             com.aegissoft.qcybutmod.core.audio.EarbudAudioLocator.stopBeep()
         }
-        sendCommand(QcyProtocol.createFindDeviceCommand(start))
-        sendCommand(QcyProtocol.packFrame(QcyProtocol.CMD_FIND_DEVICE_ALT, if (start) 0x01 else 0x00))
+        // sendFirmware=false: hasFind'siz cihaza 0x05/0x3F gönderilmez, yalnız yerel zil çalışır
+        if (sendFirmware) {
+            sendCommand(QcyProtocol.createFindDeviceCommand(start))
+            sendCommand(QcyProtocol.packFrame(QcyProtocol.CMD_FIND_DEVICE_ALT, if (start) 0x01 else 0x00))
+        }
     }
 
     fun startFitTest() {
