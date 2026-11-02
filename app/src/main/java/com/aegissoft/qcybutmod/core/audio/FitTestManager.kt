@@ -137,21 +137,13 @@ class FitTestManager(
                         else "Kulak uyum testi tamamlandı. Kulaklık silikon uçlarını kontrol edip tekrar deneyin."
                     )
                 } else if (currentState.isConnected) {
-                    // Acoustic sweep completed over A2DP + BLE GATT while connected;
-                    // verify left/right earbud active out-of-case status
-                    val leftActive = currentState.battery.leftLevel in 1..100 && !currentState.battery.isLeftCharging
-                    val rightActive = currentState.battery.rightLevel in 1..100 && !currentState.battery.isRightCharging
-                    val leftGood = leftActive || (currentState.battery.leftLevel == -1 && currentState.isConnected)
-                    val rightGood = rightActive || (currentState.battery.rightLevel == -1 && currentState.isConnected)
-                    val passed = leftGood && rightGood
-                    _testState.value = FitTestState.Completed(
-                        leftGood = leftGood,
-                        rightGood = rightGood,
-                        overallPassed = passed
+                    // No real 0x11/0x29 result within the 4.8s sweep window: fail honestly
+                    // instead of guessing a pass from battery telemetry (false-pass bug).
+                    _testState.value = FitTestState.Failed(
+                        "Test sonucu alınamadı. Kulaklık takılıyken tekrar deneyin."
                     )
                     AegisVoiceAssistant.getInstance(context).speak(
-                        if (passed) "Kulak uyum testi tamamlandı. İki kulaklıkta da akustik yalıtım ve uyum mükemmel."
-                        else "Kulak uyum testi tamamlandı. Kutuda olan veya tam oturmayan kulaklığı kontrol edin."
+                        "Test sonucu alınamadı. Kulaklık takılıyken tekrar deneyin."
                     )
                 } else {
                     _testState.value = FitTestState.Failed(
