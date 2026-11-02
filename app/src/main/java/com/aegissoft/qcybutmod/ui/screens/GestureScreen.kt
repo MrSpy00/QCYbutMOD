@@ -18,6 +18,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.aegissoft.qcybutmod.core.bluetooth.BleConnectionManager
 import com.aegissoft.qcybutmod.core.models.GestureFunctions
+import com.aegissoft.qcybutmod.core.models.ProductDatabase
+import com.aegissoft.qcybutmod.core.models.TouchSides
 import com.aegissoft.qcybutmod.ui.components.AegisCard
 import com.aegissoft.qcybutmod.ui.theme.*
 
@@ -36,29 +38,32 @@ fun GestureScreen(
     val theme = LocalAppThemeColor.current
     val state by bleManager.deviceState.collectAsState()
     var selectedEarbud by remember { mutableStateOf(0) } // 0 = Left, 1 = Right
+    val capabilities = remember(state.vendorId) { ProductDatabase.getCapabilities(state.vendorId) }
 
     // Query gesture mappings from earbud hardware (0000000D + 0x2B) on screen open
     LaunchedEffect(Unit) {
         bleManager.refreshKeyMappings()
     }
 
-    val leftGestures = remember(state.keyMappings) {
+    val leftGestures = remember(state.keyMappings, capabilities.hasLongPress) {
         listOf(
             GestureConfig("Tek Dokunma", 1, state.keyMappings[1] ?: GestureFunctions.NONE),
             GestureConfig("Çift Dokunma", 3, state.keyMappings[3] ?: GestureFunctions.PLAY_PAUSE),
             GestureConfig("Üç Dokunma", 5, state.keyMappings[5] ?: GestureFunctions.VOICE_ASSISTANT)
-            // MeloBuds Pro (19786) panel has no long-press event (only eventID 1-6);
-            // writing keyId 7/8 reaches a nonexistent event and is ignored by firmware.
-        )
+        ) + if (capabilities.hasLongPress) listOf(
+            // 0x2B tablosu keyId 7/8 canlı kanıtlandı; panel verisi yoksa CapabilityParser varsayılanı gösterir
+            GestureConfig("Uzun Basma (2 sn)", 7, state.keyMappings[7] ?: GestureFunctions.NONE)
+        ) else emptyList()
     }
 
-    val rightGestures = remember(state.keyMappings) {
+    val rightGestures = remember(state.keyMappings, capabilities.hasLongPress) {
         listOf(
             GestureConfig("Tek Dokunma", 2, state.keyMappings[2] ?: GestureFunctions.NONE),
             GestureConfig("Çift Dokunma", 4, state.keyMappings[4] ?: GestureFunctions.PLAY_PAUSE),
             GestureConfig("Üç Dokunma", 6, state.keyMappings[6] ?: GestureFunctions.NEXT_TRACK)
-            // No long-press event on this model (see left list note).
-        )
+        ) + if (capabilities.hasLongPress) listOf(
+            GestureConfig("Uzun Basma (2 sn)", 8, state.keyMappings[8] ?: GestureFunctions.NONE)
+        ) else emptyList()
     }
 
     var dialogGestureTarget by remember { mutableStateOf<GestureConfig?>(null) }
@@ -69,6 +74,12 @@ fun GestureScreen(
     }
 
     val currentList = if (selectedEarbud == 0) leftGestures else rightGestures
+    // Yetenek kapısı (H4): seçili tarafta dokunmatik sensör yoksa içerik yerine bilgi kartı
+    val sideMissingTouch = if (selectedEarbud == 0) {
+        capabilities.touchSides == TouchSides.RIGHT
+    } else {
+        capabilities.touchSides == TouchSides.LEFT
+    }
 
     LazyColumn(
         modifier = Modifier
@@ -158,40 +169,69 @@ fun GestureScreen(
             }
         }
 
-        // Gestures List
-        items(currentList.size) { index ->
-            val gesture = currentList[index]
-            val funcName = GestureFunctions.functionList.find { it.first == gesture.selectedFuncId }?.second ?: "Seçilmedi"
-
-            AegisCard(
-                modifier = Modifier.fillMaxWidth(),
-                onClick = { dialogGestureTarget = gesture }
-            ) {
-                Row(
+        // Gestures List — yetenek kapısı: tarafta dokunmatik sensör yoksa açıklayıcı kart
+        if (sideMissingTouch) {
+            item {
+                AegisCard(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+                    backgroundColor = DarkSurfaceVariant
                 ) {
-                    Column {
-                        Text(
-                            text = gesture.gestureName,
-                            color = TextPrimary,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 15.sp
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = Icons.Rounded.Info,
+                            contentDescription = null,
+                            tint = WarningAmber,
+                            modifier = Modifier.size(18.dp)
                         )
-                        Spacer(modifier = Modifier.height(4.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
                         Text(
-                            text = funcName,
-                            color = theme.primary,
+                            text = if (selectedEarbud == 0) {
+                                "Bu cihazda sol kulaklıkta dokunmatik algılama yok"
+                            } else {
+                                "Bu cihazda sağ kulaklıkta dokunmatik algılama yok"
+                            },
+                            color = WarningAmber,
+                            fontWeight = FontWeight.Bold,
                             fontSize = 13.sp
                         )
                     }
-                    Icon(
-                        imageVector = Icons.Rounded.ChevronRight,
-                        contentDescription = "Düzenle",
-                        tint = TextTertiary,
-                        modifier = Modifier.size(20.dp)
-                    )
+                }
+            }
+        } else {
+            items(currentList.size) { index ->
+                val gesture = currentList[index]
+                val funcName = GestureFunctions.functionList.find { it.first == gesture.selectedFuncId }?.second ?: "Seçilmedi"
+
+                AegisCard(
+                    modifier = Modifier.fillMaxWidth(),
+                    onClick = { dialogGestureTarget = gesture }
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column {
+                            Text(
+                                text = gesture.gestureName,
+                                color = TextPrimary,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 15.sp
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = funcName,
+                                color = theme.primary,
+                                fontSize = 13.sp
+                            )
+                        }
+                        Icon(
+                            imageVector = Icons.Rounded.ChevronRight,
+                            contentDescription = "Düzenle",
+                            tint = TextTertiary,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
                 }
             }
         }
