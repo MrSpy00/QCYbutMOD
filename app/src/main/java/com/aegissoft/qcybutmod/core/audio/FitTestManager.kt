@@ -115,9 +115,9 @@ class FitTestManager(
 
                 val ears = async(Dispatchers.IO) {
                     runCatching {
-                        val left = captureEar(wavPcm)
+                        val left = captureEar(wavPcm, audioManager)
                         delay(500L)
-                        val right = captureEar(wavPcm)
+                        val right = captureEar(wavPcm, audioManager)
                         left to right
                     }
                 }
@@ -168,6 +168,7 @@ class FitTestManager(
             } finally {
                 collector?.cancel()
                 measurement?.cancel()
+                runCatching { audioManager.stopBluetoothSco() }
                 if (modeSet) audioManager.mode = AudioManager.MODE_NORMAL
                 focusRequest?.let { audioManager.abandonAudioFocusRequest(it) }
                 bleManager.stopFitTest()
@@ -175,7 +176,21 @@ class FitTestManager(
         }
     }
 
-    private suspend fun captureEar(wavPcm: ShortArray): ShortArray {
+    private suspend fun startSco(audioManager: AudioManager) {
+        if (!audioManager.isBluetoothScoAvailableOffCall) return
+        if (audioManager.isBluetoothScoOn) audioManager.stopBluetoothSco()
+        audioManager.startBluetoothSco()
+        var attempts = 100
+        while (!audioManager.isBluetoothScoOn) {
+            val next = attempts - 1
+            if (attempts <= 0) break
+            delay(10)
+            if (next == 50) audioManager.startBluetoothSco()
+            attempts = next
+        }
+    }
+
+    private suspend fun captureEar(wavPcm: ShortArray, audioManager: AudioManager): ShortArray {
         val recBuf = AudioRecord.getMinBufferSize(
             SAMPLE_RATE, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT
         )
@@ -202,6 +217,7 @@ class FitTestManager(
         )
         try {
             return coroutineScope {
+                startSco(audioManager)
                 val captured = ByteArrayOutputStream()
                 val buf = ByteArray(recBuf)
                 record.startRecording()
@@ -234,6 +250,7 @@ class FitTestManager(
             record.release()
             runCatching { track.stop() }
             track.release()
+            runCatching { audioManager.stopBluetoothSco() }
         }
     }
 
