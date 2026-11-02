@@ -18,6 +18,7 @@ import com.aegissoft.qcybutmod.core.audio.VoiceMessages
 import com.aegissoft.qcybutmod.core.audio.VoiceSettings
 import com.aegissoft.qcybutmod.core.audio.VoiceSource
 import com.aegissoft.qcybutmod.core.models.*
+import com.aegissoft.qcybutmod.core.net.PanelRepository
 import com.aegissoft.qcybutmod.core.utils.AegisLogger
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
@@ -138,6 +139,7 @@ class BleConnectionManager private constructor(private val appContext: Context) 
 
     init {
         ProductDatabase.initFromRaw(appContext)
+        PanelRepository.init(appContext.filesDir)
         startQueueProcessor()
         registerSystemBtReceiver()
         registerProfileProxyListeners()
@@ -1877,7 +1879,19 @@ class BleConnectionManager private constructor(private val appContext: Context) 
                     String(payload, Charsets.UTF_8).trim().trimEnd('\u0000')
                 }
                 if (fwStr.isNotEmpty()) {
+                    // Firmware delta takibi: sürüm değişince (veya panel önbellekte
+                    // eksikken) resmi panel JSON'unu yeniden çek.
+                    val oldFw = _deviceState.value.firmwareVersion
                     _deviceState.update { it.copy(firmwareVersion = fwStr) }
+                    val vendorId = _deviceState.value.vendorId
+                    if (oldFw != fwStr || !PanelRepository.isCached(vendorId, fwStr)) {
+                        val modelId = ProductDatabase.getModelId(vendorId)
+                        coroutineScope.launch {
+                            PanelRepository.ensureCached(vendorId, modelId, fwStr) {
+                                AegisLogger.i(TAG, "Panel JSON: $it")
+                            }
+                        }
+                    }
                 }
             }
             QcyProtocol.CMD_REQUEST_ALL_DATA -> {

@@ -27,6 +27,7 @@ import com.aegissoft.qcybutmod.core.audio.AegisVoiceAssistant
 import com.aegissoft.qcybutmod.core.audio.VoiceSettings
 import com.aegissoft.qcybutmod.core.audio.VoiceSource
 import com.aegissoft.qcybutmod.core.bluetooth.BleConnectionManager
+import com.aegissoft.qcybutmod.core.net.PanelRepository
 import com.aegissoft.qcybutmod.core.utils.AegisLogger
 import com.aegissoft.qcybutmod.ui.components.AegisCard
 import com.aegissoft.qcybutmod.ui.theme.*
@@ -39,6 +40,7 @@ fun SettingsScreen(
     onBack: () -> Unit
 ) {
     val state by bleManager.deviceState.collectAsState()
+    val panelStatus by PanelRepository.status.collectAsState()
     val theme = LocalAppThemeColor.current
     val haptic = LocalHapticFeedback.current
 
@@ -843,6 +845,23 @@ fun SettingsScreen(
                         )
                     }
                 }
+            }
+        }
+
+        // Panel JSON durum satırı (firmware delta takibi — Task 11)
+        item {
+            val panelStatusText = when (val s = panelStatus) {
+                is PanelRepository.Status.Idle -> "—"
+                is PanelRepository.Status.Fetching -> "Yenileniyor..."
+                is PanelRepository.Status.Ok -> s.file
+                is PanelRepository.Status.Error -> "Hata: ${s.message}"
+            }
+            AegisCard(modifier = Modifier.fillMaxWidth()) {
+                Text(
+                    text = "Panel JSON: ${state.vendorId} • ${state.firmwareVersion.ifEmpty { "--" }} • $panelStatusText",
+                    color = TextSecondary,
+                    fontSize = 12.sp
+                )
             }
         }
 
