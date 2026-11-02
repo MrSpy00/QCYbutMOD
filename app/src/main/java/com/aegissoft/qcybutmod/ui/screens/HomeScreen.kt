@@ -49,6 +49,7 @@ fun HomeScreen(
     onNavigate: (String) -> Unit
 ) {
     val state by bleManager.deviceState.collectAsState()
+    val eqBands = remember(state.vendorId) { ProductDatabase.getCapabilities(state.vendorId).eqBands }
     val isScanning by bleManager.isScanning.collectAsState()
     val discoveredList by bleManager.discoveredDevices.collectAsState()
     val theme = LocalAppThemeColor.current
@@ -841,7 +842,7 @@ fun HomeScreen(
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     NavCard(
                         icon = Icons.Rounded.GraphicEq,
-                        title = "10-Bant Parametrik Ekolayzer",
+                        title = "$eqBands-Bant Parametrik Ekolayzer",
                         subtitle = "Sol/Sağ bağımsız kanal profilleri, biquad eğrileri",
                         themeColor = theme.primary,
                         onClick = {
