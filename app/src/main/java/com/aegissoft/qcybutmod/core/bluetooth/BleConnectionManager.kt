@@ -1196,9 +1196,14 @@ class BleConnectionManager private constructor(private val appContext: Context) 
     private fun startPeriodicPolling() {
         pollJob?.cancel()
         pollJob = coroutineScope.launch {
+            var toneProbeTick = 0
             while (isActive) {
                 delay(15000)
                 if (_deviceState.value.isConnected) {
+                    toneProbeTick++
+                    if (toneProbeTick % 4 == 0) {
+                        sendCommand(QcyProtocol.packFrame(QcyProtocol.CMD_REQUEST_ALL_DATA, QcyProtocol.CMD_TONE_VOLUME))
+                    }
                     // Silence heal: idle firmware legitimately goes quiet (battery notifies
                     // only on change), so probe first with a query; a live subscription
                     // answers within ~100ms (refreshing lastRxTimestamp). Only after 75s
@@ -1577,10 +1582,9 @@ class BleConnectionManager private constructor(private val appContext: Context) 
             // Query full state after CCCD subscriptions complete
             coroutineScope.launch {
                 delay(350)
-                queryStateAndBattery()
-                delay(300)
                 applyVoiceSource(VoiceSettings.getVoiceSource(appContext))
-                delay(200)
+                queryStateAndBattery()
+                delay(500)
                 val batt = _deviceState.value.battery
                 val primaryBatt = if (batt.leftLevel in 1..100) batt.leftLevel else batt.rightLevel
                 com.aegissoft.qcybutmod.core.audio.AegisVoiceAssistant.getInstance(appContext)
@@ -1982,6 +1986,8 @@ class BleConnectionManager private constructor(private val appContext: Context) 
             sendCommand(QcyProtocol.createToneVolumeCommand(0))
             _deviceState.update { it.copy(promptVolume = 0) }
             AegisLogger.w(TAG, "Firmware prompt volume resurrected to $vol - re-muting for $source")
+        } else if (source.id != "firmware_en" && vol in 1..15) {
+            scheduleStateVerification(QcyProtocol.CMD_TONE_VOLUME, delayMs = PromptMutePolicy.recheckDelayMs(now, lastPromptRemuteTimestamp))
         }
     }
 
@@ -2174,6 +2180,20 @@ class BleConnectionManager private constructor(private val appContext: Context) 
                 sendCommand(QcyProtocol.createToneVolumeCommand(savedLevel))
                 _deviceState.update { it.copy(promptVolume = savedLevel) }
                 AegisLogger.i(TAG, "Restored firmware voice prompt to $savedLevel for FIRMWARE_EN")
+            }
+        }
+        if (!PromptMutePolicy.shouldAllowVoiceAssistantGesture(source.id)) {
+            val currentMappings = _deviceState.value.keyMappings
+            val remapped = PromptMutePolicy.remapAssistantGestures(
+                currentMappings,
+                GestureFunctions.VOICE_ASSISTANT,
+                GestureFunctions.NONE
+            )
+            val changed = remapped.filterKeys { currentMappings[it] != remapped[it] }
+            if (changed.isNotEmpty()) {
+                changed.forEach { (keyId, funcId) -> setTouchGesture(keyId, funcId) }
+                refreshKeyMappings()
+                AegisLogger.i(TAG, "Remapped assistant gestures to NONE for $source: keys=${changed.keys}")
             }
         }
         scheduleStateVerification(QcyProtocol.CMD_TONE_VOLUME)

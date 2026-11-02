@@ -16,7 +16,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.aegissoft.qcybutmod.core.audio.VoiceSettings
 import com.aegissoft.qcybutmod.core.bluetooth.BleConnectionManager
+import com.aegissoft.qcybutmod.core.bluetooth.PromptMutePolicy
 import com.aegissoft.qcybutmod.core.models.GestureFunctions
 import com.aegissoft.qcybutmod.core.models.ProductDatabase
 import com.aegissoft.qcybutmod.core.models.TouchSides
@@ -39,6 +41,14 @@ fun GestureScreen(
     val state by bleManager.deviceState.collectAsState()
     var selectedEarbud by remember { mutableStateOf(0) } // 0 = Left, 1 = Right
     val capabilities = remember(state.vendorId) { ProductDatabase.getCapabilities(state.vendorId) }
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val assistantAllowed = remember(context) {
+        PromptMutePolicy.shouldAllowVoiceAssistantGesture(VoiceSettings.getVoiceSource(context).id)
+    }
+    val pickerFunctions = remember(assistantAllowed) {
+        if (assistantAllowed) GestureFunctions.functionList
+        else GestureFunctions.functionList.filter { it.first != GestureFunctions.VOICE_ASSISTANT }
+    }
 
     // Query gesture mappings from earbud hardware (0000000D + 0x2B) on screen open
     LaunchedEffect(Unit) {
@@ -255,8 +265,8 @@ fun GestureScreen(
                     modifier = Modifier.fillMaxWidth().heightIn(max = 350.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    items(GestureFunctions.functionList.size) { idx ->
-                        val (funcId, label) = GestureFunctions.functionList[idx]
+                    items(pickerFunctions.size) { idx ->
+                        val (funcId, label) = pickerFunctions[idx]
                         val isSelected = target.selectedFuncId == funcId
                         Surface(
                             modifier = Modifier
