@@ -133,7 +133,7 @@ class BatteryTrackerTest {
     @Test
     fun testCaseLevelSurvivesZeroGattCaseByte() {
         tracker.onGattRaw(byteArrayOf(0x23, 0x45, 0x64))       // case 100 biliniyor
-        val updated = tracker.onGattRaw(byteArrayOf(0x23, 0x45, 0x00)) // 0x00 = bilinmiyor → SİLME
+        val updated = tracker.onGattRaw(byteArrayOf(0x23, 0x45, 0x00)) // 0x00 = bilinmiyor → eski hatada SİLME, artık koru
         assertEquals(100, updated.caseLevel)
     }
 

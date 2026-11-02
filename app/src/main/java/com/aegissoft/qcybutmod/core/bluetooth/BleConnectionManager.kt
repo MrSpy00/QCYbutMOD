@@ -1252,6 +1252,9 @@ class BleConnectionManager private constructor(private val appContext: Context) 
                 if (_deviceState.value.isConnected) {
                     sendCommand(QcyProtocol.packFrame(QcyProtocol.CMD_REQUEST_ALL_DATA, cid))
                 }
+                // job bitince kendini kaldır (recheckDelayMs time-variant key'i verifyJobs'u sınırsız büyütüyordu);
+                // self-keyed remove, yerine geçecek yeni job'ı yanlışlıkla silmez
+                coroutineContext[Job]?.let { verifyJobs.remove(key, it) }
             }
         }
     }
@@ -1654,6 +1657,8 @@ class BleConnectionManager private constructor(private val appContext: Context) 
                                 current.copy(keyMappings = current.keyMappings + map)
                             }
                             AegisLogger.i(TAG, "Hardware key mappings read from 000D: $map")
+                            // T5: mapping'ler connect'teki sweep'ten SONRA buraya gelir
+                            sweepAssistantGestures(VoiceSettings.getVoiceSource(appContext))
                         }
                     }
                     u.contains("000b") -> {
@@ -1911,6 +1916,8 @@ class BleConnectionManager private constructor(private val appContext: Context) 
                             current.copy(keyMappings = current.keyMappings + map)
                         }
                         AegisLogger.i(TAG, "Hardware ACK Touch Gestures (0x2B): $map")
+                        // T5: 0x2B yanıtı mapping'lerin kesin geliş anı → sweep'i buradan da tetikle
+                        sweepAssistantGestures(VoiceSettings.getVoiceSource(appContext))
                     }
                 }
             }
@@ -2182,21 +2189,32 @@ class BleConnectionManager private constructor(private val appContext: Context) 
                 AegisLogger.i(TAG, "Restored firmware voice prompt to $savedLevel for FIRMWARE_EN")
             }
         }
-        if (!PromptMutePolicy.shouldAllowVoiceAssistantGesture(source.id)) {
-            val currentMappings = _deviceState.value.keyMappings
-            val remapped = PromptMutePolicy.remapAssistantGestures(
-                currentMappings,
-                GestureFunctions.VOICE_ASSISTANT,
-                GestureFunctions.NONE
-            )
-            val changed = remapped.filterKeys { currentMappings[it] != remapped[it] }
-            if (changed.isNotEmpty()) {
-                changed.forEach { (keyId, funcId) -> setTouchGesture(keyId, funcId) }
-                refreshKeyMappings()
-                AegisLogger.i(TAG, "Remapped assistant gestures to NONE for $source: keys=${changed.keys}")
-            }
-        }
+        sweepAssistantGestures(source)
         scheduleStateVerification(QcyProtocol.CMD_TONE_VOLUME)
+    }
+
+    /**
+     * T5 asistan-jest süpürmesi: firmware_en dışındaki kaynaklarda VOICE_ASSISTANT
+     * eşlemelerini NONE'a çeker. applyVoiceSource bağlanışta (+350ms) çağırır ama o
+     * anda keyMappings henüz boş olduğu için sonuçsız döner; mapping'ler connect-path
+     * üzerinde GATT 000D okuması / 0x2B ACK ile SONRA geldiğinden population
+     * sitelerinden de çağrılır — aksi halde fabrika varsayılanı/aria kalan üç-dokunma
+     * eşlemesi aegis_tr modunda İngilizce asistanı kendiliğinden tetiklerdi.
+     */
+    private fun sweepAssistantGestures(source: VoiceSource) {
+        if (PromptMutePolicy.shouldAllowVoiceAssistantGesture(source.id)) return
+        val currentMappings = _deviceState.value.keyMappings
+        val remapped = PromptMutePolicy.remapAssistantGestures(
+            currentMappings,
+            GestureFunctions.VOICE_ASSISTANT,
+            GestureFunctions.NONE
+        )
+        val changed = remapped.filterKeys { currentMappings[it] != remapped[it] }
+        if (changed.isNotEmpty()) {
+            changed.forEach { (keyId, funcId) -> setTouchGesture(keyId, funcId) }
+            refreshKeyMappings()
+            AegisLogger.i(TAG, "Remapped assistant gestures to NONE for $source: keys=${changed.keys}")
+        }
     }
 
     fun triggerFindBeep(left: Boolean, right: Boolean, sendFirmware: Boolean = true) {
