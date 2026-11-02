@@ -1225,14 +1225,20 @@ class BleConnectionManager private constructor(private val appContext: Context) 
         }
     }
 
-    private var verifyStateJob: Job? = null
+    // Gönderilen 0x17 komutunun ham paramlarını tutar; pencere içinde gelen eski değerli
+    // yankıların optimistic UI state'i ezmesini engeller.
+    private val ancEchoGuard = AncEchoGuard()
+
+    // cmdId bazlı doğrulama job'ları: aynı cmdId yeniden planlanınca SADECE kendi job'ı
+    // iptal edilir, farklı cmdId'lerin bekleyen doğrulamaları çakışmaz.
+    private val verifyJobs = mutableMapOf<Byte, Job>()
 
     private fun scheduleStateVerification(vararg cmdIds: Byte, delayMs: Long = 650L) {
-        verifyStateJob?.cancel()
-        verifyStateJob = coroutineScope.launch {
-            delay(delayMs)
-            if (_deviceState.value.isConnected) {
-                cmdIds.forEach { cid ->
+        cmdIds.forEach { cid ->
+            verifyJobs[cid]?.cancel()
+            verifyJobs[cid] = coroutineScope.launch {
+                delay(delayMs)
+                if (_deviceState.value.isConnected) {
                     sendCommand(QcyProtocol.packFrame(QcyProtocol.CMD_REQUEST_ALL_DATA, cid))
                 }
             }
@@ -1690,6 +1696,14 @@ class BleConnectionManager private constructor(private val appContext: Context) 
                         _deviceState.value.ancLevel
                     }
 
+                    // Parse sonrası, state'e yazmadan önce: gönderilen komutla eşleşmeyen
+                    // (eski değerli) geç yankı optimistic UI state'i ezmesin.
+                    val rawParams = intArrayOf(modeId, subSceneId, rawLevel)
+                    if (!ancEchoGuard.shouldApply(rawParams, System.currentTimeMillis())) {
+                        AegisLogger.d(TAG, "stale ANC echo ignored: mode=$modeId, subScene=$subSceneId, rawLevel=$rawLevel")
+                        return
+                    }
+
                     _deviceState.update {
                         it.copy(
                             ancMode = ancMode,
@@ -1931,6 +1945,16 @@ class BleConnectionManager private constructor(private val appContext: Context) 
         }
     }
 
+    /** 0x17 frame'ini göndermeden önce ham 3 paramını (mode, subScene, byte2) yankı korumasına kaydeder. */
+    private fun sendAncCommand(frame: ByteArray) {
+        // packFrame düzeni: [0xFF, len, cmdId, paramLen, mode, subScene, byte2]
+        ancEchoGuard.onSent(
+            intArrayOf(frame[4].toInt() and 0xFF, frame[5].toInt() and 0xFF, frame[6].toInt() and 0xFF),
+            System.currentTimeMillis()
+        )
+        sendCommand(frame)
+    }
+
     fun setAnc(
         mode: AncMode,
         subScene: AncSubScene = _deviceState.value.ancSubScene,
@@ -1948,7 +1972,7 @@ class BleConnectionManager private constructor(private val appContext: Context) 
             )
         }
         // Send official 0x17 ANCSetting command (do NOT send legacy 0x0C which overrides V2 ANC mode!)
-        sendCommand(QcyProtocol.createAncCommand(mode, subScene, safeLevel, transLevel))
+        sendAncCommand(QcyProtocol.createAncCommand(mode, subScene, safeLevel, transLevel))
         // Query back 0x17 state after 650ms to confirm hardware execution without reading pre-transition state
         scheduleStateVerification(QcyProtocol.CMD_ANC_SETTING)
 
@@ -1974,7 +1998,7 @@ class BleConnectionManager private constructor(private val appContext: Context) 
             )
         }
         // On MeloBuds Pro (19786), Adaptive ANC is startcmdid=66816 (0x010500 -> FF 05 17 03 01 05 00)
-        sendCommand(QcyProtocol.createAncCommand(AncMode.ANC, targetScene, _deviceState.value.ancLevel, _deviceState.value.transparencyLevel))
+        sendAncCommand(QcyProtocol.createAncCommand(AncMode.ANC, targetScene, _deviceState.value.ancLevel, _deviceState.value.transparencyLevel))
         scheduleStateVerification(QcyProtocol.CMD_ANC_SETTING)
         com.aegissoft.qcybutmod.core.audio.AegisVoiceAssistant.getInstance(appContext)
             .announceFeature("Adaptif yapay zeka gürültü engelleme", enabled)
