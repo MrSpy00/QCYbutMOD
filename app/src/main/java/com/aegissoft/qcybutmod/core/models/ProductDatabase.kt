@@ -11,7 +11,8 @@ data class ProductInfo(
     val title: String,
     val subTitle: String,
     val category: String = "earphones",
-    val features: Map<String, Any>? = null
+    val features: Map<String, Any>? = null,
+    val modelId: Int = 21020
 )
 
 object ProductDatabase {
@@ -51,7 +52,9 @@ object ProductDatabase {
                 val category = value["category"] as? String ?: "earphones"
                 @Suppress("UNCHECKED_CAST")
                 val features = value["features"] as? Map<String, Any>
-                memoryDb[vid] = ProductInfo(vid, title, subTitle, category, features)
+                // Gson JSON sayılarını Double olarak parse eder
+                val modelId = (value["modelId"] as? Double)?.toInt() ?: 21020
+                memoryDb[vid] = ProductInfo(vid, title, subTitle, category, features, modelId)
             }
             reader.close()
         } catch (e: Exception) {
@@ -103,4 +106,9 @@ object ProductDatabase {
     fun isLdacSupported(vendorId: Int): Boolean {
         return vendorId in listOf(19786, 19785, 19790, 16849, 16850, 23877)
     }
+
+    fun getCapabilities(vendorId: Int): DeviceCapabilities =
+        CapabilityParser.parse(vendorId, memoryDb[vendorId]?.features, isLdacSupported(vendorId))
+
+    fun getModelId(vendorId: Int): Int = memoryDb[vendorId]?.modelId ?: 21020
 }
