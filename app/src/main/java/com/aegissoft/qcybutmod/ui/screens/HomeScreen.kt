@@ -36,6 +36,7 @@ import com.aegissoft.qcybutmod.core.audio.NoiseMonitor
 import com.aegissoft.qcybutmod.core.bluetooth.BleConnectionManager
 import com.aegissoft.qcybutmod.core.models.AncMode
 import com.aegissoft.qcybutmod.core.models.AncSubScene
+import com.aegissoft.qcybutmod.core.models.ProductDatabase
 import com.aegissoft.qcybutmod.ui.components.AegisCard
 import com.aegissoft.qcybutmod.ui.components.BatteryRing
 import com.aegissoft.qcybutmod.ui.components.DeviceSelectionSheet
@@ -514,7 +515,7 @@ fun HomeScreen(
             }
 
             // ANC Master Control Section
-            item {
+            if (ProductDatabase.getCapabilities(state.vendorId).hasAnc) item {
                 AegisCard(modifier = Modifier.fillMaxWidth()) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -784,19 +785,21 @@ fun HomeScreen(
                             }
                         )
 
-                        QuickToggleCard(
-                            icon = Icons.Rounded.HighQuality,
-                            title = "LDAC HD Ses",
-                            subtitle = if (state.isLdacOn) "Açık • 990 kbps Hi-Res" else "Kapalı • AAC/SBC",
-                            isActive = state.isLdacOn,
-                            themeColor = theme.primary,
-                            warning = "Uyarı: Kulaklık kendiliğinden kapanıp açılabilir",
-                            modifier = Modifier.weight(1f),
-                            onClick = {
-                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                bleManager.setLdac(!state.isLdacOn)
-                            }
-                        )
+                        if (ProductDatabase.getCapabilities(state.vendorId).hasLdac) {
+                            QuickToggleCard(
+                                icon = Icons.Rounded.HighQuality,
+                                title = "LDAC HD Ses",
+                                subtitle = if (state.isLdacOn) "Açık • 990 kbps Hi-Res" else "Kapalı • AAC/SBC",
+                                isActive = state.isLdacOn,
+                                themeColor = theme.primary,
+                                warning = "Uyarı: Kulaklık kendiliğinden kapanıp açılabilir",
+                                modifier = Modifier.weight(1f),
+                                onClick = {
+                                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                    bleManager.setLdac(!state.isLdacOn)
+                                }
+                            )
+                        }
                     }
 
                     Row(

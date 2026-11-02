@@ -49,3 +49,6 @@ object CapabilityParser {
 
     private fun cmdidOf(entry: Any?): Int? = ((entry as? Map<*, *>)?.get("cmdid") as? Number)?.toInt()
 }
+
+fun DeviceCapabilities.longPressAvailable(keyMappings: Map<Int, Int>): Boolean =
+    hasLongPress || 7 in keyMappings || 8 in keyMappings

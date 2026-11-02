@@ -23,6 +23,7 @@ import com.aegissoft.qcybutmod.core.audio.AegisVoiceAssistant
 import com.aegissoft.qcybutmod.core.audio.EqBand
 import com.aegissoft.qcybutmod.core.audio.ParametricEq
 import com.aegissoft.qcybutmod.core.bluetooth.BleConnectionManager
+import com.aegissoft.qcybutmod.core.models.ProductDatabase
 import com.aegissoft.qcybutmod.ui.components.AegisCard
 import com.aegissoft.qcybutmod.ui.components.InteractiveEqGraph
 import com.aegissoft.qcybutmod.ui.theme.*
@@ -33,6 +34,7 @@ fun EqualizerScreen(
     onBack: () -> Unit
 ) {
     val state by bleManager.deviceState.collectAsState()
+    val eqBands = remember(state.vendorId) { ProductDatabase.getCapabilities(state.vendorId).eqBands }
     val theme = LocalAppThemeColor.current
     val haptic = LocalHapticFeedback.current
     val context = LocalContext.current
@@ -107,7 +109,7 @@ fun EqualizerScreen(
                 Spacer(modifier = Modifier.width(12.dp))
                 Column {
                     Text(
-                        text = "10-Bant Parametrik Ekolayzer",
+                        text = "$eqBands-Bant Parametrik Ekolayzer",
                         color = TextPrimary,
                         fontSize = 20.sp,
                         fontWeight = FontWeight.Bold
@@ -218,7 +220,7 @@ fun EqualizerScreen(
             }
         }
 
-        // 10-Band Sliders Bank
+        // shortcut: başlık capabilities.eqBands'ten gelir; slider bankası protokolün 10 bant sabitinde kalır, frekans listesi capabilities'ten üretilince eşitle
         item {
             AegisCard(modifier = Modifier.fillMaxWidth()) {
                 Text(

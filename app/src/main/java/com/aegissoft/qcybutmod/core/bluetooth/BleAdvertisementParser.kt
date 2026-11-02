@@ -283,7 +283,7 @@ object BleAdvertisementParser {
             lower.contains("t13") -> 19059
             lower.contains("t16") -> 19218
             lower.contains("ht03") -> 19393
-            else -> 19786
+            else -> 0
         }
     }
 }

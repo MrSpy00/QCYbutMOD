@@ -40,4 +40,12 @@ class CapabilityParserTest {
         val caps = CapabilityParser.parse(16849, mapOf("settings" to emptyList<Any>()), false)
         assertFalse(caps.hasMultipoint)
     }
+
+    @Test fun runtimeKeyMappingUnlocksLongPress() {
+        val features = mapOf("key_function" to mapOf("events" to listOf(mapOf("name" to "Touch"))))
+        val caps = CapabilityParser.parse(19786, features, false)
+        assertFalse(caps.hasLongPress)                                  // products.json olay listesinde "Long press" yok
+        assertTrue(caps.longPressAvailable(mapOf(7 to 4)))             // canlı 0x2B okuması 7/8 getiriyor
+        assertFalse(caps.longPressAvailable(emptyMap()))
+    }
 }

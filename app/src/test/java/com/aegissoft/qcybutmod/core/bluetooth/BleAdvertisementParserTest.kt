@@ -1,5 +1,6 @@
 package com.aegissoft.qcybutmod.core.bluetooth
 
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -26,5 +27,11 @@ class BleAdvertisementParserTest {
         assertFalse(BleAdvertisementParser.isQcyDeviceName(null))
         assertFalse(BleAdvertisementParser.isQcyDeviceName(""))
         assertFalse(BleAdvertisementParser.isQcyDeviceName("   "))
+    }
+
+    @Test
+    fun unknownNameYieldsVendorIdZero() {
+        // eşleşmeyen isim → 19786 DEĞİL (Pro yeteneklerini miras almasın)
+        assertEquals(0, BleAdvertisementParser.guessVendorIdFromName("My Buds"))
     }
 }

@@ -22,6 +22,7 @@ import com.aegissoft.qcybutmod.core.bluetooth.PromptMutePolicy
 import com.aegissoft.qcybutmod.core.models.GestureFunctions
 import com.aegissoft.qcybutmod.core.models.ProductDatabase
 import com.aegissoft.qcybutmod.core.models.TouchSides
+import com.aegissoft.qcybutmod.core.models.longPressAvailable
 import com.aegissoft.qcybutmod.ui.components.AegisCard
 import com.aegissoft.qcybutmod.ui.theme.*
 
@@ -55,23 +56,25 @@ fun GestureScreen(
         bleManager.refreshKeyMappings()
     }
 
-    val leftGestures = remember(state.keyMappings, capabilities.hasLongPress) {
+    val hasLongPressRuntime = capabilities.longPressAvailable(state.keyMappings)
+
+    val leftGestures = remember(state.keyMappings, hasLongPressRuntime) {
         listOf(
             GestureConfig("Tek Dokunma", 1, state.keyMappings[1] ?: GestureFunctions.NONE),
             GestureConfig("Çift Dokunma", 3, state.keyMappings[3] ?: GestureFunctions.PLAY_PAUSE),
             GestureConfig("Üç Dokunma", 5, state.keyMappings[5] ?: GestureFunctions.VOICE_ASSISTANT)
-        ) + if (capabilities.hasLongPress) listOf(
+        ) + if (hasLongPressRuntime) listOf(
             // 0x2B tablosu keyId 7/8 canlı kanıtlandı; panel verisi yoksa CapabilityParser varsayılanı gösterir
             GestureConfig("Uzun Basma (2 sn)", 7, state.keyMappings[7] ?: GestureFunctions.NONE)
         ) else emptyList()
     }
 
-    val rightGestures = remember(state.keyMappings, capabilities.hasLongPress) {
+    val rightGestures = remember(state.keyMappings, hasLongPressRuntime) {
         listOf(
             GestureConfig("Tek Dokunma", 2, state.keyMappings[2] ?: GestureFunctions.NONE),
             GestureConfig("Çift Dokunma", 4, state.keyMappings[4] ?: GestureFunctions.PLAY_PAUSE),
             GestureConfig("Üç Dokunma", 6, state.keyMappings[6] ?: GestureFunctions.NEXT_TRACK)
-        ) + if (capabilities.hasLongPress) listOf(
+        ) + if (hasLongPressRuntime) listOf(
             GestureConfig("Uzun Basma (2 sn)", 8, state.keyMappings[8] ?: GestureFunctions.NONE)
         ) else emptyList()
     }
