@@ -1,8 +1,11 @@
 package com.aegissoft.qcybutmod.ui.screens
 
+import android.Manifest
+import android.content.pm.PackageManager
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -18,6 +21,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -25,6 +31,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.ContextCompat
+import com.aegissoft.qcybutmod.core.audio.NoiseMonitor
 import com.aegissoft.qcybutmod.core.bluetooth.BleConnectionManager
 import com.aegissoft.qcybutmod.core.models.AncMode
 import com.aegissoft.qcybutmod.core.models.AncSubScene
@@ -140,6 +148,17 @@ fun HomeScreen(
         val context = androidx.compose.ui.platform.LocalContext.current
         val isOfficialInstalled = remember { bleManager.isOfficialQcyAppInstalled() }
         var showOfficialNotice by remember { mutableStateOf(false) }
+
+        // Gürültü göstergesi: izin her recomposition'da taze okunur ki ilk açılışta
+        // sonradan verilen mikrofon izni start() tetikleyebilsin
+        val noiseMonitor = remember { NoiseMonitor() }
+        val hasMicPermission = ContextCompat.checkSelfPermission(
+            context, Manifest.permission.RECORD_AUDIO
+        ) == PackageManager.PERMISSION_GRANTED
+        DisposableEffect(hasMicPermission) {
+            if (hasMicPermission) noiseMonitor.start()
+            onDispose { noiseMonitor.stop() }
+        }
 
         LazyColumn(
             modifier = Modifier
@@ -435,6 +454,59 @@ fun HomeScreen(
                                     fontSize = 13.sp
                                 )
                             }
+                        }
+                    }
+                }
+            }
+
+            // Ortam gürültü seviyesi — telefon mikrofonuyla yaklaşık ölçüm
+            item {
+                val noiseDb by noiseMonitor.dbfs.collectAsState()
+                val noiseHistory by noiseMonitor.history.collectAsState()
+
+                AegisCard(modifier = Modifier.fillMaxWidth()) {
+                    Text(
+                        text = "Ortam Gürültü Seviyesi",
+                        color = TextPrimary,
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Text(
+                        text = String.format("%.1f dB", noiseDb.toDouble()),
+                        color = theme.primary,
+                        fontSize = 34.sp,
+                        fontWeight = FontWeight.Black
+                    )
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(
+                        text = "Telefon mikrofonuyla yaklaşık ölçüm",
+                        color = TextTertiary,
+                        fontSize = 11.sp
+                    )
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Canvas(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(96.dp)
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(DarkSurfaceVariant)
+                    ) {
+                        // Sabit 100 örneklik (≈10sn) zaman ekseni, en sağ = en yeni örnek
+                        if (noiseHistory.size >= 2) {
+                            val stepX = size.width / 100f
+                            val path = Path().apply {
+                                noiseHistory.forEachIndexed { i, db ->
+                                    val x = i * stepX
+                                    val y = size.height * (-db / 90f)
+                                    if (i == 0) moveTo(x, y) else lineTo(x, y)
+                                }
+                            }
+                            drawPath(
+                                path = path,
+                                color = theme.primary,
+                                style = Stroke(width = 2.dp.toPx(), cap = StrokeCap.Round)
+                            )
                         }
                     }
                 }
