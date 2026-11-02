@@ -1343,7 +1343,17 @@ class BleConnectionManager private constructor(private val appContext: Context) 
         allTxChars.clear()
     }
 
+    // Auto-reconnect: firmware drops the link on 0x24 (multipoint) writes ~400ms after ACK,
+    // so an unexpected STATE_DISCONNECTED must recover on its own. The flag distinguishes
+    // user-initiated disconnect()/unpair (never auto-reconnect) from firmware/range drops.
+    private var userRequestedDisconnect = false
+    private var autoReconnectJob: Job? = null
+    private var autoReconnectAttempts = 0
+
     fun disconnect() {
+        userRequestedDisconnect = true
+        autoReconnectJob?.cancel()
+        autoReconnectJob = null
         com.aegissoft.qcybutmod.core.audio.EarbudAudioLocator.stopBeep()
         connectWatchdogJob?.cancel()
         connectWatchdogJob = null
@@ -1371,6 +1381,28 @@ class BleConnectionManager private constructor(private val appContext: Context) 
         if (wasConnected) {
             com.aegissoft.qcybutmod.core.audio.AegisVoiceAssistant.getInstance(appContext)
                 .speak("Kulaklık bağlantısı kesildi")
+        }
+    }
+
+    /**
+     * Unexpected (firmware/range) disconnect recovery: max 5 attempts, 2s apart.
+     * Attempts are counted only when a reconnect is actually launched; a connect already
+     * in progress (isConnecting) or a successful connect consumes none. The cap applies
+     * to the automatic path only — manual Hızlı Bağlan stays independent.
+     */
+    private fun scheduleAutoReconnect() {
+        autoReconnectJob?.cancel()
+        autoReconnectJob = coroutineScope.launch {
+            delay(2000)
+            val state = _deviceState.value
+            if (state.isConnected || state.isConnecting) return@launch
+            if (autoReconnectAttempts >= 5) {
+                AegisLogger.w(TAG, "Auto-reconnect gave up after 5 attempts - use Hızlı Bağlan")
+                return@launch
+            }
+            autoReconnectAttempts++
+            AegisLogger.w(TAG, "Unexpected disconnect - auto-reconnect attempt $autoReconnectAttempts/5")
+            reconnectSelectedDevice()
         }
     }
 
@@ -1409,6 +1441,10 @@ class BleConnectionManager private constructor(private val appContext: Context) 
                 BluetoothProfile.STATE_CONNECTED -> {
                     val gattAddr = gatt?.device?.address ?: ""
                     AegisLogger.i(TAG, "GATT Connected successfully to $gattAddr (TRANSPORT_LE). Negotiating MTU & discovering services...")
+                    userRequestedDisconnect = false
+                    autoReconnectAttempts = 0
+                    autoReconnectJob?.cancel()
+                    autoReconnectJob = null
                     val classic = _deviceState.value.classicMac
                     if (classic.isNotEmpty() && gattAddr.isNotEmpty() && !classic.equals(gattAddr, ignoreCase = true)) {
                         saveBleMacMapping(classic, gattAddr)
@@ -1442,6 +1478,11 @@ class BleConnectionManager private constructor(private val appContext: Context) 
                             battery = QcyBatteryInfo(leftLevel = -1, rightLevel = -1, caseLevel = -1),
                             rssi = -100
                         )
+                    }
+                    if (userRequestedDisconnect) {
+                        userRequestedDisconnect = false
+                    } else {
+                        scheduleAutoReconnect()
                     }
                 }
             }
@@ -1586,9 +1627,8 @@ class BleConnectionManager private constructor(private val appContext: Context) 
                         } else {
                             String(value, Charsets.UTF_8).trim().trimEnd('\u0000')
                         }
-                        if (fwStr.isNotEmpty()) {
-                            _deviceState.update { it.copy(firmwareVersion = fwStr) }
-                        }
+                        // Panel delta kancası için ortak handler (handleFirmwareVersionResolved).
+                        handleFirmwareVersionResolved(fwStr)
                     }
                     u.contains("0008") -> {
                         publishBattery(batteryTracker.onGattRaw(value))
@@ -1663,6 +1703,24 @@ class BleConnectionManager private constructor(private val appContext: Context) 
         if (frames.isNotEmpty()) {
             frames.forEach { frame ->
                 processQcyFrame(frame.cmdId, frame.payload)
+            }
+        }
+    }
+
+    // Firmware sürümü iki yoldan gelir: GATT char 00000007 okuması ve 0x07 frame
+    // cevabı (bu firmware yalnızca okuma yolunu kullanır). Panel delta kancası tek
+    // yerde: eski sürüm değiştiyse veya panel önbellekte yoksa resmi JSON'u çeker.
+    private fun handleFirmwareVersionResolved(fwStr: String) {
+        if (fwStr.isEmpty()) return
+        val oldFw = _deviceState.value.firmwareVersion
+        _deviceState.update { it.copy(firmwareVersion = fwStr) }
+        val vendorId = _deviceState.value.vendorId
+        if (oldFw != fwStr || !PanelRepository.isCached(vendorId, fwStr)) {
+            val modelId = ProductDatabase.getModelId(vendorId)
+            coroutineScope.launch {
+                PanelRepository.ensureCached(vendorId, modelId, fwStr) {
+                    AegisLogger.i(TAG, "Panel JSON: $it")
+                }
             }
         }
     }
@@ -1882,19 +1940,7 @@ class BleConnectionManager private constructor(private val appContext: Context) 
                     String(payload, Charsets.UTF_8).trim().trimEnd('\u0000')
                 }
                 if (fwStr.isNotEmpty()) {
-                    // Firmware delta takibi: sürüm değişince (veya panel önbellekte
-                    // eksikken) resmi panel JSON'unu yeniden çek.
-                    val oldFw = _deviceState.value.firmwareVersion
-                    _deviceState.update { it.copy(firmwareVersion = fwStr) }
-                    val vendorId = _deviceState.value.vendorId
-                    if (oldFw != fwStr || !PanelRepository.isCached(vendorId, fwStr)) {
-                        val modelId = ProductDatabase.getModelId(vendorId)
-                        coroutineScope.launch {
-                            PanelRepository.ensureCached(vendorId, modelId, fwStr) {
-                                AegisLogger.i(TAG, "Panel JSON: $it")
-                            }
-                        }
-                    }
+                    handleFirmwareVersionResolved(fwStr)
                 }
             }
             QcyProtocol.CMD_REQUEST_ALL_DATA -> {
