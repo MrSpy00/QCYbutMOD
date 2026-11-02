@@ -318,7 +318,8 @@ fun SettingsScreen(
                     Surface(
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(12.dp),
-                        color = DarkSurfaceVariant
+                        color = DarkSurfaceVariant,
+                        border = BorderStroke(1.dp, DarkBorder)
                     ) {
                         Column {
                             VoiceSource.entries.forEach { src ->
@@ -326,7 +327,7 @@ fun SettingsScreen(
                                 Row(
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .clip(RoundedCornerShape(8.dp))
+                                        .clip(RoundedCornerShape(12.dp))
                                         .background(
                                             if (isSelected) theme.primary.copy(alpha = 0.10f)
                                             else Color.Transparent
@@ -373,7 +374,7 @@ fun SettingsScreen(
                     // Extra TTS Controls when aegis TR is active
                     if (voiceSource == VoiceSource.AEGIS_TR) {
                         Spacer(modifier = Modifier.height(14.dp))
-                        HorizontalDivider(color = DarkBorder, thickness = 0.8.dp)
+                        HorizontalDivider(color = DarkBorder, thickness = 1.dp)
                         Spacer(modifier = Modifier.height(10.dp))
 
                         // Speech Rate
@@ -461,7 +462,12 @@ fun SettingsScreen(
                                         voiceAssistant.applySpeechSettings()
                                         voiceAssistant.testSpeech()
                                     },
-                                    label = { Text("Kadın", fontSize = 11.sp) }
+                                    label = { Text("Kadın", fontSize = 11.sp) },
+                                    colors = FilterChipDefaults.filterChipColors(
+                                        containerColor = Color.Transparent,
+                                        selectedContainerColor = theme.primary.copy(alpha = 0.10f)
+                                    ),
+                                    border = BorderStroke(1.dp, DarkBorder)
                                 )
                                 FilterChip(
                                     selected = gender == "male",
@@ -472,7 +478,12 @@ fun SettingsScreen(
                                         voiceAssistant.applySpeechSettings()
                                         voiceAssistant.testSpeech()
                                     },
-                                    label = { Text("Erkek", fontSize = 11.sp) }
+                                    label = { Text("Erkek", fontSize = 11.sp) },
+                                    colors = FilterChipDefaults.filterChipColors(
+                                        containerColor = Color.Transparent,
+                                        selectedContainerColor = theme.primary.copy(alpha = 0.10f)
+                                    ),
+                                    border = BorderStroke(1.dp, DarkBorder)
                                 )
                             }
                         }

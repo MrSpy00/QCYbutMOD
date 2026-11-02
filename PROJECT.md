@@ -132,3 +132,8 @@ Plan: `.superpowers/sdd/qcybutmod-yeni-zellikler-hata--2026-11-02-approved/` (12
 7. **✅ (bonus, yeni fix'ler canlı doğrulandı):** auto-reconnect (0x24 write → link drop ×4 → 2sn'de 1/5 ile geri dönüş; "Bağlantıyı Kes" negatif testi sessiz), ANC stale-echo guard (5 yankı bastırıldı, UI sabit), çeviri günlüğü persist+arama, notify-heal CCCD resubscribe, kadın/erkek chips crash'siz.
 
 **Kullanıcı katılımını bekleyen:** yalnız (ii) ses cinsinin (Kadın/Erkek) kulakla doğrulanması — ANC/şeffaf tekrar testi 18:31'de kapandı (yukarıdaki 7 numaralı madde).
+
+## 9. Hata Düzeltme Turu — Task 7 (2026-11-02)
+Plan: `.superpowers/sdd/qcybutmod-hata-dzeltme-ve-kapa-2026-11-02-approved/`. Doğrulama: **68 JVM testi yeşil (12 suite, 0 hata) + `assembleDebug` BUILD SUCCESSFUL**.
+- **"Sesli Bildirim ve Anons Kaynağı" kartı dış hatları:** kaynak konteyner `Surface`'e `border = BorderStroke(1.dp, DarkBorder)`; seçili satır vurgusu `RoundedCornerShape(8.dp)` → `12.dp` (konteyner yarıçapıyla eşleşti); `HorizontalDivider` 0.8.dp → 1.dp (alt-piksel/noktalı çizgi giderildi); Kadın/Erkek `FilterChip`'lerine `DarkBorder` kenarlığı + `containerColor = Color.Transparent` / `selectedContainerColor = theme.primary.copy(alpha = 0.10f)` dolguları.
+- Canlı ekran görüntüsü doğrulaması bir sonraki ADB oturumuna ertelendi (kompozisyon derleme ile doğrulandı).
