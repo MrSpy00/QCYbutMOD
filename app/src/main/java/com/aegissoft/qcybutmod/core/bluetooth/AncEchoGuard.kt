@@ -10,6 +10,7 @@ class AncEchoGuard(private val windowMs: Long = 2500) {
     private var lastSentAt: Long = 0L
 
     /** Gönderilen frame'in ham 3 paramını (mode, subScene, byte2) kaydeder. */
+    @Synchronized
     fun onSent(params: IntArray, at: Long) {
         lastSentParams = params
         lastSentAt = at
@@ -17,17 +18,20 @@ class AncEchoGuard(private val windowMs: Long = 2500) {
 
     /**
      * Yankı uygulanmalı mı? Pencere içindeki ve gönderilenle eşleşmeyen yankı
-     * eski/ geçersizdir → false (bekleyen kayıt korunur). Eşleşen → true + kayıt temizlenir.
-     * Bekleyen kayıt yoksa veya pencere dışındaysa → true.
+     * eski/geçersizdir → false (bekleyen kayıt korunur). Eşleşen → true, bekleyen
+     * kayıt pencere dolana dek korunur. Kayıt yoksa veya pencere dışındaysa → true.
      */
+    @Synchronized
     fun shouldApply(params: IntArray, at: Long): Boolean {
         val pending = lastSentParams ?: return true
         if (at - lastSentAt > windowMs) {
             lastSentParams = null // pencere doldu, harici değişiklik serbest
             return true
         }
-        if (!params.contentEquals(pending)) return false // stale yankı yok sayılır
-        lastSentParams = null // eşleşen yankı kabul edildi, bekleyen kayıt temizlendi
+        if (!canonicalize(params).contentEquals(canonicalize(pending))) return false
         return true
     }
+
+    private fun canonicalize(p: IntArray): IntArray =
+        intArrayOf(p[0], if (p[0] == 1 && (p[1] == 0 || p[1] == 5)) 0 else p[1], p[2])
 }

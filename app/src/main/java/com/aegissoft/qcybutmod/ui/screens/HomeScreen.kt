@@ -569,6 +569,7 @@ fun HomeScreen(
                                     .clip(RoundedCornerShape(10.dp))
                                     .background(bgColor)
                                     .clickable {
+                                        if (!state.isConnected) return@clickable
                                         haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                                         bleManager.setAnc(mode)
                                     }
@@ -619,6 +620,7 @@ fun HomeScreen(
                                 Switch(
                                     checked = state.isAiAdaptiveAncOn,
                                     onCheckedChange = {
+                                        if (!state.isConnected) return@Switch
                                         haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                                         bleManager.setAdaptiveAiAnc(it)
                                     },
@@ -653,6 +655,7 @@ fun HomeScreen(
                                         modifier = Modifier
                                             .clip(RoundedCornerShape(10.dp))
                                             .clickable {
+                                                if (!state.isConnected) return@clickable
                                                 haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                                                 bleManager.setAnc(AncMode.ANC, subScene = scene)
                                             }
@@ -697,6 +700,7 @@ fun HomeScreen(
                                 Slider(
                                     value = state.ancLevel.coerceIn(1, 3).toFloat(),
                                     onValueChange = {
+                                        if (!state.isConnected) return@Slider
                                         val newLvl = it.toInt().coerceIn(1, 3)
                                         if (newLvl != state.ancLevel) {
                                             haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
@@ -741,8 +745,12 @@ fun HomeScreen(
                             Slider(
                                 value = state.transparencyLevel.toFloat(),
                                 onValueChange = {
-                                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                    bleManager.setAnc(AncMode.TRANSPARENCY, transLevel = it.toInt())
+                                    if (!state.isConnected) return@Slider
+                                    val newLvl = it.toInt().coerceIn(1, 6)
+                                    if (newLvl != state.transparencyLevel) {
+                                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                        bleManager.setAnc(AncMode.TRANSPARENCY, transLevel = newLvl)
+                                    }
                                 },
                                 valueRange = 1f..6f,
                                 steps = 4,

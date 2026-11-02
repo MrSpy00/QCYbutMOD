@@ -1745,7 +1745,9 @@ class BleConnectionManager private constructor(private val appContext: Context) 
                         1 -> AncMode.ANC
                         2 -> AncMode.OFF
                         3 -> AncMode.TRANSPARENCY
-                        else -> _deviceState.value.ancMode
+                        else -> _deviceState.value.ancMode.also {
+                            AegisLogger.w(TAG, "Unknown ANC modeId=$modeId ignored")
+                        }
                     }
                     val subScene = when {
                         ancMode == AncMode.ANC && (subSceneId == 5 || subSceneId == 0) -> AncSubScene.ADAPTIVE
@@ -1787,7 +1789,7 @@ class BleConnectionManager private constructor(private val appContext: Context) 
                         2 -> AncMode.TRANSPARENCY
                         else -> AncMode.OFF
                     }
-                    _deviceState.update { it.copy(ancMode = ancMode) }
+                    AegisLogger.d(TAG, "Legacy ANC frame (0x0C) ignored: modeId=$modeId ($ancMode)")
                 }
             }
             QcyProtocol.CMD_ADAPTIVE_AI_ANC -> {
