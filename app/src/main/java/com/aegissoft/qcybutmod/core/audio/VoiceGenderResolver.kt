@@ -11,6 +11,9 @@ object VoiceGenderResolver {
     private fun VoiceInfo.isFemaleCoded(): Boolean =
         name.contains("female", ignoreCase = true) || name.contains("trf", ignoreCase = true)
 
+    fun hasFemaleCandidate(candidates: List<VoiceInfo>): Boolean =
+        candidates.any { it.isFemaleCoded() }
+
     /** Highest-quality female-coded voice, else highest-quality overall; null only when empty. */
     fun pickVoiceName(candidates: List<VoiceInfo>, gender: String): String? {
         if (candidates.isEmpty()) return null

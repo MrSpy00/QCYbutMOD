@@ -1,6 +1,8 @@
 package com.aegissoft.qcybutmod.core.audio
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class VoiceGenderResolverTest {
@@ -17,4 +19,10 @@ class VoiceGenderResolverTest {
         assertEquals("b", VoiceGenderResolver.pickVoiceName(voices, "female"))
     }
     @Test fun pitchDefaults() { assertEquals(1.15f, VoiceGenderResolver.pitchFor("female")); assertEquals(0.88f, VoiceGenderResolver.pitchFor("male")); assertEquals(1.0f, VoiceGenderResolver.pitchFor("x")) }
+    @Test fun hasFemaleCandidateDetectsInventory() {
+        assertFalse(VoiceGenderResolver.hasFemaleCandidate(listOf(VoiceInfo("tr-tr-x-trm-network", 500))))
+        assertTrue(VoiceGenderResolver.hasFemaleCandidate(listOf(
+            VoiceInfo("tr-tr-x-trm-network", 500), VoiceInfo("tr-tr-x-trf-network", 480)
+        )))
+    }
 }

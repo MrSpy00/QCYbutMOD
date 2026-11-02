@@ -477,6 +477,15 @@ fun SettingsScreen(
                             }
                         }
 
+                        if (!voiceAssistant.hasFemaleTurkishVoice()) {
+                            Text(
+                                text = "Cihazda Türkçe kadın sesi bulunamadı — Google TTS uygulamasından Türkçe ses paketini indirin.",
+                                color = WarningAmber,
+                                fontSize = 10.5.sp,
+                                lineHeight = 14.sp
+                            )
+                        }
+
                         Spacer(modifier = Modifier.height(4.dp))
                         Button(
                             onClick = {

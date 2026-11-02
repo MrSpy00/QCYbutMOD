@@ -11,6 +11,7 @@ import android.os.Looper
 import android.speech.tts.TextToSpeech
 import android.speech.tts.UtteranceProgressListener
 import android.util.Log
+import com.aegissoft.qcybutmod.core.utils.AegisLogger
 import java.util.Locale
 
 class AegisVoiceAssistant private constructor(private val context: Context) : TextToSpeech.OnInitListener {
@@ -32,6 +33,7 @@ class AegisVoiceAssistant private constructor(private val context: Context) : Te
     private var isReady = false
     private var trSelectedVoice: android.speech.tts.Voice? = null
     private var phoneRouteUtteranceId: String? = null
+    private var voiceInventoryLogged = false
 
     // Debounce guard to prevent speaking the exact same phrase within 1500ms
     private var lastSpokenText: String = ""
@@ -122,6 +124,14 @@ class AegisVoiceAssistant private constructor(private val context: Context) : Te
     private fun selectTurkishVoice() {
         try {
             val trVoices = tts?.voices?.filter { it.locale.language == "tr" } ?: emptyList()
+            if (!voiceInventoryLogged) {
+                voiceInventoryLogged = true
+                AegisLogger.i(
+                    TAG,
+                    "Turkish voice inventory (${trVoices.size}): " +
+                        trVoices.joinToString { "${it.name} quality=${it.quality}" }
+                )
+            }
             val gender = VoiceSettings.getVoiceGender(context)
             val pickedName = VoiceGenderResolver.pickVoiceName(
                 trVoices.map { VoiceInfo(it.name, it.quality) },
@@ -133,13 +143,18 @@ class AegisVoiceAssistant private constructor(private val context: Context) : Te
             if (best != null) {
                 tts?.voice = best
                 trSelectedVoice = best
-                Log.i(TAG, "Turkish voice selected: ${best.name} quality=${best.quality} network=${best.isNetworkConnectionRequired}")
+                AegisLogger.i(TAG, "Turkish voice selected: ${best.name} quality=${best.quality} network=${best.isNetworkConnectionRequired}")
             } else {
-                Log.i(TAG, "No explicit Turkish voice exposed by engine, keeping language default")
+                AegisLogger.i(TAG, "No explicit Turkish voice exposed by engine, keeping language default")
             }
         } catch (e: Exception) {
             Log.w(TAG, "Turkish voice selection failed", e)
         }
+    }
+
+    fun hasFemaleTurkishVoice(): Boolean {
+        val trVoices = tts?.voices?.filter { it.locale.language == "tr" } ?: emptyList()
+        return VoiceGenderResolver.hasFemaleCandidate(trVoices.map { VoiceInfo(it.name, it.quality) })
     }
 
     private fun requestFocus() {
