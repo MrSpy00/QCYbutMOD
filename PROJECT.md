@@ -128,3 +128,4 @@ Plan: `.superpowers/sdd/qcybutmod-yeni-zellikler-hata--2026-11-02-approved/` (12
 3. Panel JSON fetch (firmware delta → otomatik yenileme).
 4. Fit test gerçek sonuç (sahte geçiş yok teyidi).
 5. Prompt re-mute (FE ses-seviye yazınca firmware bip'inin otomatik susması).
+6. FindDeviceScreen kısa ekran taşma kontrolü (chips +44dp, park edilen T8 bulgusu).
