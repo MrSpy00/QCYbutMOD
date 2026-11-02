@@ -1,0 +1,36 @@
+<resources>
+    <string name="app_name">QCYbutMOD</string>
+    <string name="app_title">aegis QCY</string>
+    
+    <!-- ANC Strings -->
+    <string name="anc_title">Gürültü Kontrolü</string>
+    <string name="anc_mode_anc">Gürültü Engelleme</string>
+    <string name="anc_mode_off">Normal (Kapalı)</string>
+    <string name="anc_mode_transparency">Şeffaf Mod</string>
+    
+    <!-- ANC Sub-scenes -->
+    <string name="scene_adaptive">Adaptif</string>
+    <string name="scene_indoor">İç Mekan</string>
+    <string name="scene_commute">Yolculuk</string>
+    <string name="scene_noisy">Kalabalık</string>
+    <string name="scene_anti_wind">Rüzgar Önleme</string>
+    
+    <!-- Features -->
+    <string name="feature_game_mode">Oyun Modu (Düşük Gecikme)</string>
+    <string name="feature_ldac">LDAC Yüksek Kalite</string>
+    <string name="feature_in_ear">Takma / Çıkarma Algılama</string>
+    <string name="feature_sleep">Uyku Modu (Dokunmatik Kilitli)</string>
+    <string name="feature_multipoint">Çift Cihaz Bağlantısı (Multipoint)</string>
+    <string name="feature_fit_test">Kulak Ucu Sızdırmazlık Testi</string>
+    <string name="feature_find_earphone">Kulaklıklarımı Bul</string>
+    <string name="feature_balance">Kanal Dengesi (Sol/Sağ)</string>
+    <string name="feature_eq">10-Bant Parametrik Ekolayzer</string>
+    
+    <!-- General -->
+    <string name="left_earbud">Sol Kulaklık</string>
+    <string name="right_earbud">Sağ Kulaklık</string>
+    <string name="charging_case">Şarj Kutusu</string>
+    <string name="connected">Bağlandı</string>
+    <string name="disconnected">Bağlantı Kesildi</string>
+    <string name="scanning">QCY Aygıtları Aranıyor…</string>
+</resources>

@@ -1,0 +1,107 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- Outer Headband Arc (Deep Metallic Crimson) -->
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M31,55 C31,39.5 41.2,29 54,29 C66.8,29 77,39.5 77,55"
+        android:strokeWidth="5.2"
+        android:strokeLineCap="round">
+        <aapt:attr name="android:strokeColor">
+            <gradient
+                android:endX="77"
+                android:endY="55"
+                android:startX="31"
+                android:startY="29"
+                android:type="linear">
+                <item android:color="#FF4B6E" android:offset="0.0" />
+                <item android:color="#FF1744" android:offset="0.5" />
+                <item android:color="#B70929" android:offset="1.0" />
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!-- Inner Headband Cushion Accent -->
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M39,37 C43,33.5 48.2,31.8 54,31.8 C59.8,31.8 65,33.5 69,37"
+        android:strokeColor="#FF6B88"
+        android:strokeLineCap="round"
+        android:strokeWidth="2.0" />
+
+    <!-- Left Studio Ear Cup Shell -->
+    <path android:pathData="M33,48 C36.3,48 39,50.7 39,54 L39,67 C39,70.3 36.3,73 33,73 C28.6,73 25,69.4 25,65 L25,56 C25,51.6 28.6,48 33,48 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:endX="39"
+                android:endY="73"
+                android:startX="25"
+                android:startY="48"
+                android:type="linear">
+                <item android:color="#FF2A55" android:offset="0.0" />
+                <item android:color="#D5002B" android:offset="1.0" />
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!-- Right Studio Ear Cup Shell -->
+    <path android:pathData="M75,48 C79.4,48 83,51.6 83,56 L83,65 C83,69.4 79.4,73 75,73 C71.7,73 69,70.3 69,67 L69,54 C69,50.7 71.7,48 75,48 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:endX="83"
+                android:endY="73"
+                android:startX="69"
+                android:startY="48"
+                android:type="linear">
+                <item android:color="#FF2A55" android:offset="0.0" />
+                <item android:color="#D5002B" android:offset="1.0" />
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!-- Left Inner Cushion Bar -->
+    <path
+        android:fillColor="#160206"
+        android:pathData="M36.5,51.5 C37.9,51.5 39,52.6 39,54 L39,67 C39,68.4 37.9,69.5 36.5,69.5 C35.1,69.5 34,68.4 34,67 L34,54 C34,52.6 35.1,51.5 36.5,51.5 Z" />
+
+    <!-- Right Inner Cushion Bar -->
+    <path
+        android:fillColor="#160206"
+        android:pathData="M71.5,51.5 C72.9,51.5 74,52.6 74,54 L74,67 C74,68.4 72.9,69.5 71.5,69.5 C70.1,69.5 69,68.4 69,67 L69,54 C69,52.6 70.1,51.5 71.5,51.5 Z" />
+
+    <!-- Center Acoustic Pulse Bars (Crimson Red) -->
+    <path
+        android:fillColor="#FF1744"
+        android:pathData="M54,47 L54,67"
+        android:strokeColor="#FF1744"
+        android:strokeLineCap="round"
+        android:strokeWidth="3.2" />
+    <path
+        android:fillColor="#FF4B6E"
+        android:pathData="M48,52 L48,62"
+        android:strokeColor="#FF4B6E"
+        android:strokeLineCap="round"
+        android:strokeWidth="2.8" />
+    <path
+        android:fillColor="#FF4B6E"
+        android:pathData="M60,52 L60,62"
+        android:strokeColor="#FF4B6E"
+        android:strokeLineCap="round"
+        android:strokeWidth="2.8" />
+    <path
+        android:fillColor="#B70929"
+        android:pathData="M42.8,55.5 L42.8,58.5"
+        android:strokeColor="#D5002B"
+        android:strokeLineCap="round"
+        android:strokeWidth="2.4" />
+    <path
+        android:fillColor="#B70929"
+        android:pathData="M65.2,55.5 L65.2,58.5"
+        android:strokeColor="#D5002B"
+        android:strokeLineCap="round"
+        android:strokeWidth="2.4" />
+</vector>

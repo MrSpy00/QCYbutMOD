@@ -1,0 +1,10 @@
+# Build artifacts
+.gradle/
+build/
+.kotlin/
+local.properties
+*.iml
+
+# Large reference artifacts (decompiled sources, logs, screenshots)
+tools/
+*.png
