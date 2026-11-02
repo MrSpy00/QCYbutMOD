@@ -77,7 +77,14 @@ class AegisVoiceAssistant private constructor(private val context: Context) : Te
                 // speakTranslation re-applies it for tr targets since setting language resets voice.
                 try {
                     val trVoices = tts?.voices?.filter { it.locale.language == "tr" } ?: emptyList()
-                    val best = trVoices.maxByOrNull { it.quality }
+                    val gender = VoiceSettings.getVoiceGender(context)
+                    val pickedName = VoiceGenderResolver.pickVoiceName(
+                        trVoices.map { VoiceInfo(it.name, it.quality) },
+                        gender
+                    )
+                    // null (empty/no match) keeps the legacy max-quality fallback
+                    val best = trVoices.firstOrNull { it.name == pickedName }
+                        ?: trVoices.maxByOrNull { it.quality }
                     if (best != null) {
                         tts?.voice = best
                         trSelectedVoice = best
@@ -125,7 +132,7 @@ class AegisVoiceAssistant private constructor(private val context: Context) : Te
     fun applySpeechSettings() {
         val rate = VoiceSettings.getTtsRate(context)
         tts?.setSpeechRate(rate)
-        tts?.setPitch(1.0f)
+        tts?.setPitch(VoiceGenderResolver.pitchFor(VoiceSettings.getVoiceGender(context)))
     }
 
     private fun requestFocus() {

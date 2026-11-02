@@ -279,6 +279,7 @@ fun SettingsScreen(
                 val voiceAssistant = remember { AegisVoiceAssistant.getInstance(context) }
                 var ttsRate by remember { mutableStateOf(VoiceSettings.getTtsRate(context)) }
                 var ttsVolume by remember { mutableStateOf(VoiceSettings.getTtsVolume(context)) }
+                var gender by remember { mutableStateOf(VoiceSettings.getVoiceGender(context)) }
 
                 Column(modifier = Modifier.fillMaxWidth()) {
                     Row(
@@ -310,28 +311,32 @@ fun SettingsScreen(
 
                     Spacer(modifier = Modifier.height(12.dp))
 
-                    // 3 Source Options
-                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        VoiceSource.entries.forEach { src ->
-                            val isSelected = voiceSource == src
-                            Surface(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clip(RoundedCornerShape(10.dp))
-                                    .clickable {
-                                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                        voiceSource = src
-                                        bleManager.applyVoiceSource(src)
-                                        if (src == VoiceSource.AEGIS_TR) {
-                                            voiceAssistant.speak("aegis Türkçe sesli bildirim devrede")
-                                        }
-                                    },
-                                color = if (isSelected) theme.primary.copy(alpha = 0.12f) else DarkSurfaceVariant,
-                                border = if (isSelected) BorderStroke(1.dp, theme.primary) else BorderStroke(1.dp, DarkBorder)
-                            ) {
+                    // 3 Source Options — one shared container, selected row highlighted
+                    // (per-row borders made the outline look broken)
+                    Surface(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp),
+                        color = DarkSurfaceVariant
+                    ) {
+                        Column {
+                            VoiceSource.entries.forEach { src ->
+                                val isSelected = voiceSource == src
                                 Row(
                                     modifier = Modifier
                                         .fillMaxWidth()
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .background(
+                                            if (isSelected) theme.primary.copy(alpha = 0.10f)
+                                            else Color.Transparent
+                                        )
+                                        .clickable {
+                                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                            voiceSource = src
+                                            bleManager.applyVoiceSource(src)
+                                            if (src == VoiceSource.AEGIS_TR) {
+                                                voiceAssistant.speak("aegis Türkçe sesli bildirim devrede")
+                                            }
+                                        }
                                         .padding(12.dp),
                                     verticalAlignment = Alignment.CenterVertically,
                                     horizontalArrangement = Arrangement.SpaceBetween
@@ -429,6 +434,46 @@ fun SettingsScreen(
                             steps = 7,
                             colors = SliderDefaults.colors(thumbColor = theme.primary, activeTrackColor = theme.primary)
                         )
+
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        // Voice Gender
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "Ses Cinsi",
+                                color = TextPrimary,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Medium
+                            )
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                FilterChip(
+                                    selected = gender == "female",
+                                    onClick = {
+                                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                        gender = "female"
+                                        VoiceSettings.setVoiceGender(context, "female")
+                                        voiceAssistant.applySpeechSettings()
+                                        voiceAssistant.testSpeech()
+                                    },
+                                    label = { Text("Kadın", fontSize = 11.sp) }
+                                )
+                                FilterChip(
+                                    selected = gender == "male",
+                                    onClick = {
+                                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                        gender = "male"
+                                        VoiceSettings.setVoiceGender(context, "male")
+                                        voiceAssistant.applySpeechSettings()
+                                        voiceAssistant.testSpeech()
+                                    },
+                                    label = { Text("Erkek", fontSize = 11.sp) }
+                                )
+                            }
+                        }
 
                         Spacer(modifier = Modifier.height(4.dp))
                         Button(

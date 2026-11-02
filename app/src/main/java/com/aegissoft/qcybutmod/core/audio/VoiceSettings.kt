@@ -14,6 +14,7 @@ object VoiceSettings {
     private const val KEY_VOICE_SOURCE = "voice_source"
     private const val KEY_TTS_RATE = "tts_rate"
     private const val KEY_TTS_VOLUME = "tts_volume"
+    private const val KEY_TTS_GENDER = "tts_voice_gender"
     private const val KEY_SAVED_FW_LEVEL = "saved_firmware_prompt_level"
     private const val KEY_TRANSLATE_TTS = "translate_tts_headset"
     private const val KEY_TRANSLATE_TTS_ROUTE = "translate_tts_route"
@@ -47,6 +48,15 @@ object VoiceSettings {
 
     fun setTtsVolume(context: Context, volume: Float) {
         getPrefs(context).edit().putFloat(KEY_TTS_VOLUME, volume.coerceIn(0.1f, 1.0f)).apply()
+    }
+
+    /** "female" (default) or "male"; consumed by VoiceGenderResolver for voice pick + pitch. */
+    fun getVoiceGender(context: Context): String {
+        return getPrefs(context).getString(KEY_TTS_GENDER, "female") ?: "female"
+    }
+
+    fun setVoiceGender(context: Context, gender: String) {
+        getPrefs(context).edit().putString(KEY_TTS_GENDER, gender).apply()
     }
 
     fun getSavedFirmwarePromptLevel(context: Context): Int {
