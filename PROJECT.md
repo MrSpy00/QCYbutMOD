@@ -105,7 +105,7 @@ Plan: `.superpowers/sdd/qcybutmod-yeni-zellikler-hata--2026-11-02-approved/` (12
 - **Kulaklık LE-reklamı kapalıyken** (#5 jest e2e, #6 multipoint canlı toggle, #8 otomatik bağlanma, bağlı-yken ekran görüntüleri) uçtan uca test bloke — kullanıcı kulaklığı kutudan çıkarıp uyandırmalı; uygulama tarafı hazır (kalıcı tarama + beacon'da anında bağlanma).
 - **(a) Gürültü ölçümü yaklaşık:** firmware ANC-mic ham akışını BLE'ye açmaz; `NoiseMonitor` gösterge telefon mikrofonuyla **yaklaşık** ölçer (yönlü/gürültü göstergesi amaçlı, kalibre cihaz değeri değil).
 - **(b) `touchSides` H4 override sabit:** `CapabilityParser.rightTouchOnlyVendorIds = {16849, 16850}` — `products.json` yan (touch side) bilgisi taşımadığı için sabit kodlanmış override (`DeviceCapabilities.kt` shortcut yorumu); panel JSON yan verisi entegre edilene kadar geçerli.
-- **(c) Canlı cihaz doğrulaması ADB ile yapıldı (2026-11-02 17:35-18:30):** Tüm canlı kontroller `ADB_LIVE_TEST_NOTES.md` dosyasında kanıt loglarıyla; yalnızca 2 madde kullanıcının fiziksel katılımını bekliyor (kulaklık takılı ANC tekrar testi, kadın/erkek sesinin kulakla doğrulanması).
+- **(c) Canlı cihaz doğrulaması ADB ile yapıldı (2026-11-02 17:35-18:32):** Tüm canlı kontroller `ADB_LIVE_TEST_NOTES.md` dosyasında kanıt loglarıyla; yalnızca ses cinsinin (Kadın/Erkek) kulakla doğrulanması kullanıcının kulağına kaldı (ANC takılı tekrar testi 18:31'de kullanıcı canlı kullanarak kapattı).
 
 ### Doğrulama Test Listesi (Task 12 kaydı)
 **JVM Unit Testleri — 49 test / 10 suite, 0 hata (2026-11-02, `:app:testDebugUnitTest` yeşil):**
@@ -131,4 +131,4 @@ Plan: `.superpowers/sdd/qcybutmod-yeni-zellikler-hata--2026-11-02-approved/` (12
 6. **✅** FindDevice kısa ekran: 1280x2800'de clip yok; İkili patern burst zamanlaması 400/300ms tam.
 7. **✅ (bonus, yeni fix'ler canlı doğrulandı):** auto-reconnect (0x24 write → link drop ×4 → 2sn'de 1/5 ile geri dönüş; "Bağlantıyı Kes" negatif testi sessiz), ANC stale-echo guard (5 yankı bastırıldı, UI sabit), çeviri günlüğü persist+arama, notify-heal CCCD resubscribe, kadın/erkek chips crash'siz.
 
-**Kullanıcı katılımını bekleyen:** (i) ANC/şeffaf mod tekrar testi — **kulaklıklar kulaktayken** (kutudayken firmware 0x17 state okuması hep `[02 00 00]` döndü); (ii) ses cinsinin (Kadın/Erkek) kulakla doğrulanması.
+**Kullanıcı katılımını bekleyen:** yalnız (ii) ses cinsinin (Kadın/Erkek) kulakla doğrulanması — ANC/şeffaf tekrar testi 18:31'de kapandı (yukarıdaki 7 numaralı madde).
