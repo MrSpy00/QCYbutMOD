@@ -1760,14 +1760,8 @@ class BleConnectionManager private constructor(private val appContext: Context) 
                         if (vol in 1..15) {
                             VoiceSettings.setSavedFirmwarePromptLevel(appContext, vol)
                         }
-                    } else if (vol > 0 && System.currentTimeMillis() - lastPromptRemuteTimestamp > 2000L) {
-                        // Firmware reset its prompt volume mid-session (e.g. after a
-                        // self-restart triggered by LDAC / in-ear toggles) - re-mute so only
-                        // the Turkish assistant speaks.
-                        lastPromptRemuteTimestamp = System.currentTimeMillis()
-                        sendCommand(QcyProtocol.createToneVolumeCommand(0))
-                        _deviceState.update { it.copy(promptVolume = 0) }
-                        AegisLogger.w(TAG, "Firmware prompt volume resurrected to $vol - re-muting for $source")
+                    } else {
+                        enforcePromptMutePolicy(vol)
                     }
                 }
             }
@@ -1877,16 +1871,39 @@ class BleConnectionManager private constructor(private val appContext: Context) 
                     val inEar = payload.getOrNull(2)?.toInt() == 1
                     val bal = payload.getOrNull(3)?.toInt() ?: 10
                     val vol = payload.getOrNull(4)?.toInt() ?: 8
+                    val promptVol = vol.coerceIn(0, 15)
                     _deviceState.update {
                         it.copy(
                             isGameModeOn = game,
                             isInEarDetectionOn = inEar,
                             channelBalance = bal.coerceIn(0, 20),
-                            promptVolume = vol.coerceIn(0, 15)
+                            promptVolume = promptVol
                         )
                     }
+                    // Connect-time bulk replies report prompt volume > 0 (e.g. FF 04 1D 02 06 0F)
+                    // which re-armed the firmware's English prompts - re-mute here too.
+                    enforcePromptMutePolicy(promptVol)
                 }
             }
+        }
+    }
+
+    /**
+     * Firmware prompt ses seviyesi sıfırdan farklı raporlandığında (0x1D tekil yanıt ve
+     * 0xFE toplu yanıt) kaynak modu "firmware_en" değilse ToneVol 0 göndererek yeniden
+     * susturur; 2 sn'lik debounce yankı fırtınasını engeller.
+     */
+    private fun enforcePromptMutePolicy(vol: Int) {
+        val source = VoiceSettings.getVoiceSource(appContext)
+        val now = System.currentTimeMillis()
+        if (PromptMutePolicy.shouldRemute(source.id, vol, now, lastPromptRemuteTimestamp, 2000L)) {
+            // Firmware reset its prompt volume mid-session (e.g. after a
+            // self-restart triggered by LDAC / in-ear toggles) - re-mute so only
+            // the Turkish assistant speaks.
+            lastPromptRemuteTimestamp = now
+            sendCommand(QcyProtocol.createToneVolumeCommand(0))
+            _deviceState.update { it.copy(promptVolume = 0) }
+            AegisLogger.w(TAG, "Firmware prompt volume resurrected to $vol - re-muting for $source")
         }
     }
 
