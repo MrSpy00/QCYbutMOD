@@ -225,6 +225,15 @@ class BleConnectionManager private constructor(private val appContext: Context) 
         }
     }
 
+    /**
+     * API 31+ altında BLUETOOTH_CONNECT yokken profil/adapter sorguları
+     * SecurityException fırlatır (ana iş parçacığında yakalanmazsa uygulamayı çökertir).
+     */
+    private fun hasBtConnectPermission(): Boolean =
+        Build.VERSION.SDK_INT < Build.VERSION_CODES.S ||
+            appContext.checkSelfPermission(android.Manifest.permission.BLUETOOTH_CONNECT) ==
+            android.content.pm.PackageManager.PERMISSION_GRANTED
+
     private fun registerProfileProxyListeners() {
         val adapter = bluetoothAdapter ?: return
         try {
@@ -232,8 +241,18 @@ class BleConnectionManager private constructor(private val appContext: Context) 
                 override fun onServiceConnected(profile: Int, proxy: BluetoothProfile) {
                     if (profile == BluetoothProfile.A2DP) {
                         a2dpProfile = proxy as? BluetoothA2dp
-                        Log.i(TAG, "A2DP Proxy connected. Devices: ${a2dpProfile?.connectedDevices?.map { it.name }}")
-                        refreshBondedDevices(autoConnect = true)
+                        // Bu geri çağırma ana iş parçacığında iner; izin yokken connectedDevices
+                        // SecurityException fırlatır ve uygulamayı açılışta çökertirdi (recipient crash).
+                        try {
+                            if (!hasBtConnectPermission()) {
+                                AegisLogger.w(TAG, "BLUETOOTH_CONNECT yok — A2DP durum sorgusu atlandı")
+                                return
+                            }
+                            Log.i(TAG, "A2DP Proxy connected. Devices: ${a2dpProfile?.connectedDevices?.map { it.name }}")
+                            refreshBondedDevices(autoConnect = true)
+                        } catch (e: SecurityException) {
+                            AegisLogger.w(TAG, "A2DP proxy izin hatası: ${e.message}")
+                        }
                     }
                 }
                 override fun onServiceDisconnected(profile: Int) {
@@ -280,6 +299,8 @@ class BleConnectionManager private constructor(private val appContext: Context) 
     private val systemBtReceiver = object : android.content.BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: android.content.Intent?) {
             intent ?: return
+            // İzin yokken BluetoothDevice.name / profil çağrıları SecurityException fırlatır — asla çökmesin
+            try {
             when (intent.action) {
                 "android.bluetooth.device.action.BATTERY_LEVEL_CHANGED" -> {
                     val device = getParcelableDevice(intent) ?: return
@@ -348,6 +369,9 @@ class BleConnectionManager private constructor(private val appContext: Context) 
                         startScanning(autoConnect = true)
                     }
                 }
+            }
+            } catch (e: Exception) {
+                AegisLogger.w(TAG, "BT broadcast işlenemedi: ${e.message}")
             }
         }
     }
@@ -971,6 +995,10 @@ class BleConnectionManager private constructor(private val appContext: Context) 
         if (userInitiated) autoConnectSuspended = false
         val adapter = bluetoothAdapter ?: return
         if (!adapter.isEnabled) return
+        if (!hasBtConnectPermission()) {
+            AegisLogger.w(TAG, "BLUETOOTH_CONNECT yok — bağlantı atlandı (uygulama ayarlarından izin verin)")
+            return
+        }
 
         connectWatchdogJob?.cancel()
         closeCurrentGatt()
