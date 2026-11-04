@@ -46,3 +46,26 @@
 - 0x4D/0x4F telefon listesi sorgusuna bu firmware sessiz (eski log'da da yoktu) → listede "bulunamadı" beklenen davranış.
 - Kutu pili: hep -1/0x00 (bilinen limit).
 - Logcat Honor tarafından şifreleniyor (HKS) → sadece uygulama logu kullanılabilir.
+
+## 2026-11-04 TURU — Görev 1–11 (release + çökme kök nedeni)
+> Build: `:app:testDebugUnitTest` **95/95 (18 suite)** + `assembleDebug` + `assembleRelease` BUILD SUCCESSFUL. HEAD `c0c9b38` (ledger: 4be896d→cbe26e4→49cd5b0→fa936e2→a17e999→2a25b63→b5eadd2→5c0ce56→bc60622→c0c9b38).
+
+### DropBox forensics — MagicOS'ta logcat yerine kaynak (YENİ yöntem)
+- Logcat HKS ile şifreli → **`adb shell "dumpsys dropbox --print 2>/dev/null"` = tek güvenilir çökme kaynağı** (her `data_app_crash` entry'sinde tam stack + `Crash-Handler:` satırı görünür; `Process:` entry başına 2× tekrar eder — sayım yaparken entry başlığından say!).
+- Örnek (2026-11-04 14:55-14:57, release v200): **6 identical crash** = `SecurityException: Need android.permission.BLUETOOTH_CONNECT … A2dpServiceBinder` → `BleConnectionManager$registerProfileProxyListeners$1.onServiceConnected(BleConnectionManager.kt:235)` (`a2dpProfile?.connectedDevices?.map{it.name}` log satırı, ana iş parçacığında). **Alıcının telefonundaki "hata veriyo" buydu** — taze kurulumda izin verilmemişken her açılışta çökerdi; yerel debug'da izin zaten verili olduğu için hiç üretilmedi.
+
+### Çökme fix'i repro kanıtı (`c0c9b38`)
+1. Fix öncesi: release taze kurulum → `am start` her seferinde ~200-300ms içinde process ölümü + launcher'a dönüş; DropBox 6 entry.
+2. Fix sonrası (`hasBtConnectPermission()` guard: A2DP geri çağrısı + `systemBtReceiver.onReceive` try/catch + `connect()` giriş çıkışı): `adb uninstall` + taze `adb install app-release.apk` → **izin verilmemişken** 3× `am start -W` (Status ok, COLD) → `ps -A` her seferinde süreç ayakta (pid 9560/10605/10779), sonunda `mCurrentFocus = com.aegissoft.qcybutmod/.ui.MainActivity`, **DropBox entry sayısı 6'da sabit (yeni crash YOK)**.
+3. İzin dialogu (`GrantPermissionsActivity`) açılıyor ve uygulama arkasında yaşamaya devam ediyor — eskiden dialog gelmeden çöküyordu.
+
+### Release kurulumu (dağıtım durumu)
+- `app\build\outputs\apk\release\app-release.apk` — 86.4MB, `apksigner verify` **v2 OK (CN=aegisSoft)**, badging: `com.aegissoft.qcybutmod` / vc200 / vn1.2.0 / `application-label:'QCYbutMOD'` / minSdk26.
+- Cihazda: `adb uninstall com.aegissoft.qcybutmod.debug` → `adb install app-release.apk` → başlatma OK (debug ile yan yana KURULAMAZ, imza/id farklı).
+- Kullanıcı senaryosu: alıcıdaki eski hatalı paylaşımlar (95MB v1.1.0 debug) yerine **yalnız release 1.2.0 dağıtılacak**; alıcıda önceden `.debug` varsa önce kaldırılır.
+
+### Bu turda ADB ile doğrulananlar
+- ✅ Release açılış stabilitesi izinsiz (yukarıdaki repro, 3/3).
+- ✅ Release imza/badging/etiket (QCYbutMOD, 1.2.0).
+- ✅ `git grep -i -E "aegis\s*qcy"` → 0 eşleşme (kullanıcıya dönük marka süpürmesi temiz).
+- ⚠️ Bekleyen (kullanıcı etkileşimi): Google TTS Türkçe kadın ses paketi indirmesi (Ayarlar → Ses → "Ses paketini indir" kartı), fit test canlı koşusu (kulaklık takılı), multipoint 2. cihaz canlı testi, uzun basma atamasının kulakta işitilir doğrulaması.
