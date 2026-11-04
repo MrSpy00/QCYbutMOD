@@ -1,7 +1,7 @@
 # PROJECT.md — QCYbutMOD
 
 ## 1. Proje Kimliği & Standartlar
-- **Proje Adı:** QCYbutMOD (aegis QCY)
+- **Proje Adı:** QCYbutMOD
 - **Paket / Namespace:** `com.aegissoft.qcybutmod`
 - **Kurumsal Kimlik:** aegisSoft (`aegissoft.com.tr`)
 - **Baş Geliştirici:** mrSpy (`https://github.com/MrSpy00`)

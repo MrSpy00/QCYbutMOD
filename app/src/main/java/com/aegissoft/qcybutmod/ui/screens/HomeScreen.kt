@@ -212,7 +212,7 @@ fun HomeScreen(
                             }
                             Spacer(modifier = Modifier.height(4.dp))
                             Text(
-                                text = "aegis QCY doğrudan BLE GATT üzerinden çalıştığı için orijinal uygulamayı kaldırmanıza gerek yoktur. Çakışmayı önlemek için yalnızca arka planda kapalı tutmanız yeterlidir.",
+                                text = "QCYbutMOD doğrudan BLE GATT üzerinden çalıştığı için orijinal uygulamayı kaldırmanıza gerek yoktur. Çakışmayı önlemek için yalnızca arka planda kapalı tutmanız yeterlidir.",
                                 color = TextSecondary,
                                 fontSize = 11.sp,
                                 lineHeight = 15.sp

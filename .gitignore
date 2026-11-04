@@ -8,3 +8,9 @@ local.properties
 # Large reference artifacts (decompiled sources, logs, screenshots)
 tools/
 *.png
+
+# Release signing (never commit)
+release/
+keystore.properties
+*.jks
+*.keystore
