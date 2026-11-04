@@ -28,6 +28,9 @@ import java.util.concurrent.ConcurrentHashMap
 import kotlin.math.roundToInt
 
 @SuppressLint("MissingPermission")
+/** Multipoint 0x4D sorgu durumu — UI'ya dürüst "yanıt bekleniyor/yok" bilgisi verir. */
+enum class MultipointQueryStatus { IDLE, WAITING, ANSWERED, NO_RESPONSE }
+
 class BleConnectionManager private constructor(private val appContext: Context) {
 
     companion object {
@@ -54,6 +57,10 @@ class BleConnectionManager private constructor(private val appContext: Context) 
     val actionHistory: StateFlow<List<ActionSnapshot>> = actionMemory.history
     val lastAction: StateFlow<ActionSnapshot?> = actionMemory.lastAction
     val syncInfo: StateFlow<SyncInfo> = actionMemory.syncInfo
+    private val _multipointQueryStatus = MutableStateFlow(MultipointQueryStatus.IDLE)
+    val multipointQueryStatus: StateFlow<MultipointQueryStatus> = _multipointQueryStatus.asStateFlow()
+    @Volatile private var mpLastTx: String = ""
+    @Volatile private var mpLastRx: String = ""
 
     fun clearActionHistory() = actionMemory.clear()
 
@@ -1986,14 +1993,19 @@ class BleConnectionManager private constructor(private val appContext: Context) 
                 AegisLogger.i(TAG, "Hardware ACK Fit Test (0x%02X): left=${result.leftEarGoodSeal}, right=${result.rightEarGoodSeal}, completed=${result.isCompleted}".format(cmdId))
             }
             QcyProtocol.CMD_MULTIPOINT_QUERY -> {
+                mpLastRx = "RX 0x4D len=${payload.size}: ${hexDump(payload)}"
                 // null → yanıt yok/geçersiz, mevcut liste korunur; boş liste → state temizlenir
                 val phones = QcyProtocol.parsePhoneListResponse(payload)
                 if (phones != null) {
                     _deviceState.update { it.copy(pairedPhones = phones) }
+                    _multipointQueryStatus.value = MultipointQueryStatus.ANSWERED
                     AegisLogger.i(TAG, "Hardware ACK Multipoint Paired Phones: ${phones.size}")
+                } else {
+                    AegisLogger.w(TAG, "0x4D geçersiz/boş yanıt, liste korunuyor: ${mpLastRx}")
                 }
             }
             QcyProtocol.CMD_PHONE_STATUS -> {
+                mpLastRx = "RX 0x4F len=${payload.size}: ${hexDump(payload)}"
                 val statusPair = QcyProtocol.parsePhoneStatus(payload)
                 if (statusPair != null) {
                     val (mac, active) = statusPair
@@ -2193,16 +2205,45 @@ class BleConnectionManager private constructor(private val appContext: Context) 
     fun refreshMultipointDevices() {
         if (!gateFeature("Çoklu bağlantı listesi")) return
         // Resmi app requestPhoneInfo: FE+0x24 (multipoint durumu) VE FE+0x4D (liste) birlikte sorgulanır
-        sendCommand(QcyProtocol.packFrame(QcyProtocol.CMD_REQUEST_ALL_DATA, QcyProtocol.CMD_MULTIPOINT_CONTROL))
-        sendCommand(QcyProtocol.packFrame(QcyProtocol.CMD_REQUEST_ALL_DATA, QcyProtocol.CMD_MULTIPOINT_QUERY))
-        // Canlı logta cihaz 0x4D'ye tek seferde cevap vermeyebiliyor → tek retry
+        val frame24 = QcyProtocol.packFrame(QcyProtocol.CMD_REQUEST_ALL_DATA, QcyProtocol.CMD_MULTIPOINT_CONTROL)
+        val frame4D = QcyProtocol.packFrame(QcyProtocol.CMD_REQUEST_ALL_DATA, QcyProtocol.CMD_MULTIPOINT_QUERY)
+        mpLastTx = "TX 0x24=${hexDump(frame24)} | TX 0x4D=${hexDump(frame4D)}"
+        _multipointQueryStatus.value = MultipointQueryStatus.WAITING
+        sendCommand(frame24)
+        sendCommand(frame4D)
+        // Canlı logta cihaz 0x4D'ye tek seferde cevap vermeyebiliyor → tek retry + dürüst zaman aşımı
         coroutineScope.launch {
             delay(1200)
-            if (_deviceState.value.isConnected) {
+            if (_deviceState.value.isConnected && _multipointQueryStatus.value == MultipointQueryStatus.WAITING) {
                 sendCommand(QcyProtocol.packFrame(QcyProtocol.CMD_REQUEST_ALL_DATA, QcyProtocol.CMD_MULTIPOINT_QUERY))
+            }
+            delay(2000)
+            if (_multipointQueryStatus.value == MultipointQueryStatus.WAITING) {
+                _multipointQueryStatus.value = MultipointQueryStatus.NO_RESPONSE
+                AegisLogger.w(TAG, "Multipoint 0x4D yanıt yok (zaman aşımı); TX=$mpLastTx RX=$mpLastRx")
             }
         }
     }
+
+    /** Kullanıcıyla paylaşılabilir multipoint tanı metni (TX/RX hex + durum). */
+    fun multipointDiagnosticsText(): String = buildString {
+        appendLine("QCYbutMOD multipoint tanı")
+        appendLine("zaman: ${java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.getDefault()).format(java.util.Date())}")
+        appendLine("durum: ${_multipointQueryStatus.value}")
+        appendLine("bağlı: ${_deviceState.value.isConnected} • model: ${_deviceState.value.modelName}")
+        appendLine(mpLastTx.ifEmpty { "TX: yok" })
+        appendLine(mpLastRx.ifEmpty { "RX: 0x4D/0x4F yanıt gelmedi" })
+    }
+
+    /** Telefonda eşleşmiş klasik cihazlar — kulaklığın kendi multipoint listesi DEĞİLDİR (yerel bilgi). */
+    fun localBondedDevices(): List<Pair<String, String>> = runCatching {
+        bluetoothAdapter?.bondedDevices
+            ?.map { (it.name ?: "İsimsiz cihaz") to it.address }
+            ?.sortedBy { it.first.lowercase() }
+            ?: emptyList()
+    }.getOrDefault(emptyList())
+
+    private fun hexDump(bytes: ByteArray): String = bytes.joinToString(" ") { "%02X".format(it) }
 
     fun setPhoneBtAction(connectPhone: Boolean, phoneMac: String, phoneName: String = "") {
         if (!gateFeature("Telefon bağlantı eylemi")) return

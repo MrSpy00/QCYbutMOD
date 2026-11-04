@@ -1,5 +1,6 @@
 package com.aegissoft.qcybutmod.ui.screens
 
+import android.content.Intent
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -13,11 +14,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.aegissoft.qcybutmod.core.bluetooth.BleConnectionManager
+import com.aegissoft.qcybutmod.core.bluetooth.MultipointQueryStatus
 import com.aegissoft.qcybutmod.core.models.ProductDatabase
 import com.aegissoft.qcybutmod.ui.components.AegisCard
 import com.aegissoft.qcybutmod.ui.theme.*
@@ -30,6 +33,9 @@ fun MultipointScreen(
     val state by bleManager.deviceState.collectAsState()
     val theme = LocalAppThemeColor.current
     val haptic = LocalHapticFeedback.current
+    val context = LocalContext.current
+    val queryStatus by bleManager.multipointQueryStatus.collectAsState()
+    val localBonded = remember(state.isConnected) { bleManager.localBondedDevices() }
     val hasMultipoint = remember(state.vendorId) {
         ProductDatabase.getCapabilities(state.vendorId).hasMultipoint
     }
@@ -223,45 +229,192 @@ fun MultipointScreen(
                         )
                     }
                 } else if (state.pairedPhones.isEmpty()) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 12.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        Icon(
-                            imageVector = Icons.Rounded.DevicesOther,
-                            contentDescription = null,
-                            tint = TextTertiary,
-                            modifier = Modifier.size(36.dp)
-                        )
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text(
-                            text = "Eşleşen telefon bulunamadı",
-                            color = TextSecondary,
-                            fontSize = 12.sp
-                        )
-                        Spacer(modifier = Modifier.height(10.dp))
-                        OutlinedButton(
-                            onClick = {
-                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                bleManager.refreshMultipointDevices()
-                            },
-                            shape = RoundedCornerShape(8.dp)
+                    when (queryStatus) {
+                        MultipointQueryStatus.WAITING -> Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 12.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
                         ) {
                             Icon(
                                 imageVector = Icons.Rounded.Refresh,
                                 contentDescription = null,
                                 tint = theme.primary,
-                                modifier = Modifier.size(16.dp)
+                                modifier = Modifier.size(30.dp)
                             )
-                            Spacer(modifier = Modifier.width(6.dp))
+                            Spacer(modifier = Modifier.height(8.dp))
                             Text(
-                                text = "Yenile",
-                                color = theme.primary,
-                                fontSize = 12.sp,
+                                text = "Yanıt bekleniyor…",
+                                color = TextPrimary,
+                                fontSize = 13.sp,
                                 fontWeight = FontWeight.Bold
                             )
+                            Text(
+                                text = "Kulaklık 0x4D cihaz listesine yanıt aranıyor.",
+                                color = TextTertiary,
+                                fontSize = 11.sp
+                            )
+                        }
+                        MultipointQueryStatus.NO_RESPONSE -> Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 8.dp)
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    imageVector = Icons.Rounded.BluetoothDisabled,
+                                    contentDescription = null,
+                                    tint = WarningAmber,
+                                    modifier = Modifier.size(22.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = "Kulaklık listeden yanıt vermedi",
+                                    color = WarningAmber,
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                            Spacer(modifier = Modifier.height(6.dp))
+                            Text(
+                                text = "Cihaz 0x4D sorgusuna yanıt yazmadı (liste uydurulmaz, yalnızca gerçek yanıt gösterilir). Deneyin:",
+                                color = TextSecondary,
+                                fontSize = 11.sp
+                            )
+                            Spacer(modifier = Modifier.height(6.dp))
+                            Text(
+                                text = "1) Kulaklığı kılıfından çıkarıp yeniden bağlayın.\n2) Çift cihaz modunu kapatıp tekrar açın.\n3) İkinci cihazı kulaklığa yakın tutup listeyi yenileyin.",
+                                color = TextTertiary,
+                                fontSize = 11.sp
+                            )
+                            Spacer(modifier = Modifier.height(10.dp))
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                OutlinedButton(
+                                    onClick = {
+                                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                        bleManager.refreshMultipointDevices()
+                                    },
+                                    shape = RoundedCornerShape(8.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Rounded.Refresh,
+                                        contentDescription = null,
+                                        tint = theme.primary,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text("Tekrar Dene", color = theme.primary, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                }
+                                OutlinedButton(
+                                    onClick = {
+                                        runCatching {
+                                            val send = Intent(Intent.ACTION_SEND).apply {
+                                                type = "text/plain"
+                                                putExtra(Intent.EXTRA_SUBJECT, "QCYbutMOD multipoint tanı")
+                                                putExtra(Intent.EXTRA_TEXT, bleManager.multipointDiagnosticsText())
+                                            }
+                                            context.startActivity(Intent.createChooser(send, "Tanı kaydını paylaş"))
+                                        }
+                                    },
+                                    shape = RoundedCornerShape(8.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Rounded.Share,
+                                        contentDescription = null,
+                                        tint = TextSecondary,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text("Tanı Kaydı", color = TextSecondary, fontSize = 12.sp)
+                                }
+                            }
+                        }
+                        MultipointQueryStatus.ANSWERED -> Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 12.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Icon(
+                                imageVector = Icons.Rounded.DevicesOther,
+                                contentDescription = null,
+                                tint = TextTertiary,
+                                modifier = Modifier.size(36.dp)
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text(
+                                text = "Kulaklıkta kayıtlı ikinci cihaz yok",
+                                color = TextSecondary,
+                                fontSize = 12.sp
+                            )
+                            Text(
+                                text = "Donanım boş liste yanıtı verdi (gerçek durum).",
+                                color = TextTertiary,
+                                fontSize = 10.sp
+                            )
+                            Spacer(modifier = Modifier.height(10.dp))
+                            OutlinedButton(
+                                onClick = {
+                                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                    bleManager.refreshMultipointDevices()
+                                },
+                                shape = RoundedCornerShape(8.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Rounded.Refresh,
+                                    contentDescription = null,
+                                    tint = theme.primary,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(
+                                    text = "Yenile",
+                                    color = theme.primary,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
+                        else -> Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 12.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Icon(
+                                imageVector = Icons.Rounded.DevicesOther,
+                                contentDescription = null,
+                                tint = TextTertiary,
+                                modifier = Modifier.size(36.dp)
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text(
+                                text = "Eşleşen telefon bulunamadı",
+                                color = TextSecondary,
+                                fontSize = 12.sp
+                            )
+                            Spacer(modifier = Modifier.height(10.dp))
+                            OutlinedButton(
+                                onClick = {
+                                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                    bleManager.refreshMultipointDevices()
+                                },
+                                shape = RoundedCornerShape(8.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Rounded.Refresh,
+                                    contentDescription = null,
+                                    tint = theme.primary,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(
+                                    text = "Yenile",
+                                    color = theme.primary,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
                         }
                     }
                 } else {
@@ -364,6 +517,62 @@ fun MultipointScreen(
                                     }
                                 }
                             }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Yerel telefon eşleşmeleri — kulaklığın kendi multipoint listesi değildir
+        if (state.isConnected && localBonded.isNotEmpty()) {
+            item {
+                AegisCard(
+                    modifier = Modifier.fillMaxWidth(),
+                    backgroundColor = DarkSurfaceVariant
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = Icons.Rounded.PhoneAndroid,
+                            contentDescription = null,
+                            tint = TextTertiary,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Column {
+                            Text(
+                                text = "Bu Telefonun Eşleşmeleri (yerel)",
+                                color = TextPrimary,
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                text = "Kulaklığın çoklu bağlantı listesi değildir; yalnızca bu cihazda kayıtlı eşleşmeler.",
+                                color = TextTertiary,
+                                fontSize = 10.sp
+                            )
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(8.dp))
+                    localBonded.forEach { (name, mac) ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 4.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = name,
+                                color = TextSecondary,
+                                fontSize = 12.sp,
+                                maxLines = 1,
+                                modifier = Modifier.weight(1f)
+                            )
+                            Text(
+                                text = mac,
+                                color = TextTertiary,
+                                fontSize = 10.sp
+                            )
                         }
                     }
                 }
