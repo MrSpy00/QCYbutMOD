@@ -25,4 +25,26 @@ class VoiceGenderResolverTest {
             VoiceInfo("tr-tr-x-trm-network", 500), VoiceInfo("tr-tr-x-trf-network", 480)
         )))
     }
+
+    @Test fun newGoogleTrIdsPickFemaleVoice() {
+        // Canlı envanter (Google TTS TR paketi): tmc/ama=erkek, cfs/efu/mfm=kadın
+        val voices = listOf(
+            VoiceInfo("tr-tr-x-tmc-network", 400), VoiceInfo("tr-TR-language", 400),
+            VoiceInfo("tr-tr-x-cfs-local", 400), VoiceInfo("tr-tr-x-mfm-local", 400)
+        )
+        assertEquals("tr-tr-x-cfs-local", VoiceGenderResolver.pickVoiceName(voices, "female"))
+        assertTrue(VoiceGenderResolver.hasFemaleCandidate(voices))
+    }
+
+    @Test fun newGoogleTrIdsPickMaleVoice() {
+        val voices = listOf(
+            VoiceInfo("tr-tr-x-cfs-local", 400), VoiceInfo("tr-tr-x-tmc-network", 400),
+            VoiceInfo("tr-tr-x-ama-local", 400)
+        )
+        assertEquals("tr-tr-x-tmc-network", VoiceGenderResolver.pickVoiceName(voices, "male"))
+    }
+
+    @Test fun languageVoiceIsNotTreatedAsFemale() {
+        assertFalse(VoiceGenderResolver.hasFemaleCandidate(listOf(VoiceInfo("tr-TR-language", 400))))
+    }
 }

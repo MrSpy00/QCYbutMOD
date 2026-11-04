@@ -1199,6 +1199,23 @@ class BleConnectionManager private constructor(private val appContext: Context) 
                     startScanning(autoConnect = true)
                     delay(4000)
                 } else {
+                    // Çift adresli Wuqi kulaklıklarda klasik MAC LE'ye cevap vermez (kanıtlanmıştır);
+                    // türetilen LE adresiyle bir kez daha dene, o da başarısızsa taramaya düş.
+                    val derived = AutoConnectDecision.deriveLeAddress(classicMac)
+                    if (derived != null) {
+                        AegisLogger.i(TAG, "Direct LE on classic failed; trying derived LE address $derived (classic: $classicMac)")
+                        _deviceState.update { it.copy(lastAutoConnectResult = "türetilmiş LE deneniyor") }
+                        initiateGattConnection(
+                            bleAddr = derived,
+                            classicMac = classicMac,
+                            modelName = modelName,
+                            vendorId = vendorId,
+                            beaconBattery = _deviceState.value.battery,
+                            beaconRssi = -45
+                        )
+                        // Yeni denemenin kendi watchdog'u var; alttaki sıfırlama/timeout bu turu ezmesin.
+                        return@launch
+                    }
                     // Direct-on-classic attempt failed (buds LE-silent): re-arm the persistent
                     // auto-connect scan BEFORE isConnecting resets below, so startScanning's
                     // immediate-connect block is skipped (isConnecting still true) and we only
@@ -1664,6 +1681,9 @@ class BleConnectionManager private constructor(private val appContext: Context) 
             }
 
             actionMemory.markSynced(_deviceState.value.vendorId, _deviceState.value.firmwareVersion)
+            // Başarılı bağlantıda BLE adresini cache'e yaz (beacon gelmeden kurulan
+            // türetilmiş/direkt LE oturumları da dahil) — sonraki açılışlar anında bağlanır.
+            runCatching { saveBleMacMapping(_deviceState.value.classicMac, _deviceState.value.bleAddress) }
 
             // Subscribe to notifications on 0000A001 RX characteristics first, then any secondary RX characteristics
             resubscribeAllNotifications(gatt)
