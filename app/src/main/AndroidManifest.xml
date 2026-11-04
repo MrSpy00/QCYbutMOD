@@ -26,16 +26,19 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE" tools:targetApi="upside_down_cake" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.VIBRATE" />
-    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+
+    <uses-feature
+        android:name="android.hardware.bluetooth_le"
+        android:required="false" />
 
     <application
         android:name=".AegisApplication"
-        android:allowBackup="true"
+        android:allowBackup="false"
         android:icon="@mipmap/ic_launcher"
-        android:label="aegis QCY"
+        android:label="QCYbutMOD"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
-        android:theme="@style/Theme.QCYbutMOD">
+        android:theme="@style/Theme.QCYbutMOD">>
 
         <activity
             android:name=".ui.MainActivity"
@@ -52,7 +55,7 @@
         <service
             android:name=".core.service.QcyTileService"
             android:icon="@drawable/ic_anc_tile"
-            android:label="aegis QCY ANC"
+            android:label="QCYbutMOD ANC"
             android:permission="android.permission.BIND_QUICK_SETTINGS_TILE"
             android:exported="true">
             <intent-filter>
@@ -67,5 +70,11 @@
             android:exported="false" />
 
     </application>
+
+    <!-- Google TTS ses paketi kurulumu için paket görünürlüğü (Android 11+) -->
+    <queries>
+        <package android:name="com.google.android.tts" />
+        <package android:name="com.google.android.apps.speechservices" />
+    </queries>
 
 </manifest>

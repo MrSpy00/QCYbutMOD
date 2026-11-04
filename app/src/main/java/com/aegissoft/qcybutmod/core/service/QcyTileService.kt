@@ -14,6 +14,7 @@ import kotlinx.coroutines.launch
 class QcyTileService : TileService() {
 
     private val serviceScope = CoroutineScope(Dispatchers.Main + SupervisorJob())
+    private var stateCollectJob: kotlinx.coroutines.Job? = null
     private lateinit var bleManager: BleConnectionManager
 
     override fun onCreate() {
@@ -24,11 +25,25 @@ class QcyTileService : TileService() {
     override fun onStartListening() {
         super.onStartListening()
         updateTileState()
-        serviceScope.launch {
+        stateCollectJob?.cancel()
+        stateCollectJob = serviceScope.launch {
             bleManager.deviceState.collect {
                 updateTileState()
             }
         }
+    }
+
+    override fun onStopListening() {
+        stateCollectJob?.cancel()
+        stateCollectJob = null
+        super.onStopListening()
+    }
+
+    override fun onDestroy() {
+        stateCollectJob?.cancel()
+        stateCollectJob = null
+        serviceScope.coroutineContext[kotlinx.coroutines.Job]?.cancel()
+        super.onDestroy()
     }
 
     override fun onClick() {
@@ -71,7 +86,7 @@ class QcyTileService : TileService() {
 
         if (!state.isConnected) {
             tile.state = Tile.STATE_INACTIVE
-            tile.label = "QCY ANC"
+            tile.label = "QCYbutMOD ANC"
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                 tile.subtitle = "Bağlı Değil"
             }
@@ -81,7 +96,7 @@ class QcyTileService : TileService() {
                 AncMode.ANC, AncMode.TRANSPARENCY -> Tile.STATE_ACTIVE
             }
 
-            tile.label = "QCY ANC"
+            tile.label = "QCYbutMOD ANC"
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                 tile.subtitle = when (state.ancMode) {
                     AncMode.OFF -> "Kapalı"

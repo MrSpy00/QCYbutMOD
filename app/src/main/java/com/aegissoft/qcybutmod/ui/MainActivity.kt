@@ -43,15 +43,22 @@ class MainActivity : ComponentActivity() {
         setContent {
             var currentTheme by remember { mutableStateOf(AppThemeColor.fromId(savedThemeId)) }
 
-            // Permission requester
-            val permissions = remember {
+            // BT-required izinler: bunlar olmadan bağlantı kurulamaz
+            val btPermissions = remember {
                 val list = mutableListOf<String>()
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                     list.add(Manifest.permission.BLUETOOTH_SCAN)
                     list.add(Manifest.permission.BLUETOOTH_CONNECT)
                 }
                 list.add(Manifest.permission.ACCESS_FINE_LOCATION)
-                list.add(Manifest.permission.ACCESS_COARSE_LOCATION)
+                if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) {
+                    list.add(Manifest.permission.ACCESS_COARSE_LOCATION)
+                }
+                list.toTypedArray()
+            }
+            // Opsiyonel izinler: BT özelliklerini KİLİTLEMEZ (fit test / bildirim)
+            val optionalPermissions = remember {
+                val list = mutableListOf<String>()
                 list.add(Manifest.permission.RECORD_AUDIO)
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                     list.add(Manifest.permission.POST_NOTIFICATIONS)
@@ -59,22 +66,28 @@ class MainActivity : ComponentActivity() {
                 list.toTypedArray()
             }
 
+            fun hasBtPermissions(): Boolean = btPermissions.all {
+                ContextCompat.checkSelfPermission(this@MainActivity, it) == PackageManager.PERMISSION_GRANTED
+            }
+
             val permissionLauncher = rememberLauncherForActivityResult(
                 ActivityResultContracts.RequestMultiplePermissions()
             ) { perms ->
-                val allGranted = perms.values.all { it }
-                if (allGranted) {
+                // Yalnız BT izinlerine bakar; RECORD_AUDIO/POST_NOTIFICATIONS reddini tolere eder
+                val btOk = btPermissions.all { perms[it] == true } || hasBtPermissions()
+                if (btOk) {
                     QcyBackgroundService.startService(applicationContext)
                     bleManager.startScanning(autoConnect = true)
                 }
             }
 
             LaunchedEffect(Unit) {
-                val needRequest = permissions.any {
+                val all = btPermissions + optionalPermissions
+                val needRequest = all.any {
                     ContextCompat.checkSelfPermission(this@MainActivity, it) != PackageManager.PERMISSION_GRANTED
                 }
                 if (needRequest) {
-                    permissionLauncher.launch(permissions)
+                    permissionLauncher.launch(all)
                 } else {
                     QcyBackgroundService.startService(applicationContext)
                     bleManager.startScanning(autoConnect = true)

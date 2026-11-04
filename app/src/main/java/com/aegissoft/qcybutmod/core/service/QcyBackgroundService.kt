@@ -6,6 +6,7 @@ import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.IBinder
+import android.util.Log
 import androidx.core.app.NotificationCompat
 import com.aegissoft.qcybutmod.R
 import com.aegissoft.qcybutmod.core.bluetooth.BleConnectionManager
@@ -18,6 +19,7 @@ class QcyBackgroundService : Service() {
     companion object {
         const val CHANNEL_ID = "qcy_background_channel"
         const val NOTIFICATION_ID = 1001
+        private const val TAG = "QcyBackgroundService"
 
         const val ACTION_CYCLE_ANC = "com.aegissoft.qcybutmod.ACTION_CYCLE_ANC"
         const val ACTION_TOGGLE_GAME = "com.aegissoft.qcybutmod.ACTION_TOGGLE_GAME"
@@ -26,10 +28,16 @@ class QcyBackgroundService : Service() {
 
         fun startService(context: Context) {
             val intent = Intent(context, QcyBackgroundService::class.java)
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                context.startForegroundService(intent)
-            } else {
-                context.startService(intent)
+            try {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    context.startForegroundService(intent)
+                } else {
+                    context.startService(intent)
+                }
+            } catch (e: Exception) {
+                // Android 14+ connectedDevice FGS için uygun izin yoksa fırlatır;
+                // bildirimsiz devam et, asla çökme.
+                Log.w(TAG, "FGS başlatılamadı, servis atlanıyor", e)
             }
         }
 
@@ -49,12 +57,17 @@ class QcyBackgroundService : Service() {
 
         val initialNotif = buildNotification(
             content = "L: --  •  R: --  •  Kutu: --",
-            title = "aegis QCY • Bağlı Değil",
+            title = "QCYbutMOD • Bağlı Değil",
             subText = "Beklemede",
             isConnected = false
         )
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            startForeground(NOTIFICATION_ID, initialNotif, ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE)
+            try {
+                startForeground(NOTIFICATION_ID, initialNotif, ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE)
+            } catch (e: Exception) {
+                // Android 14+ izin yoksa fırlatır; servis arka planda bildirimsiz devam etsin, çökme yok.
+                Log.w(TAG, "startForeground başarısız", e)
+            }
         } else {
             startForeground(NOTIFICATION_ID, initialNotif)
         }
@@ -78,7 +91,7 @@ class QcyBackgroundService : Service() {
 
                     val title = "${state.modelName} • $ancStr"
                     val content = "Sol: $leftStr  •  Sağ: $rightStr  •  Kutu: $caseStr"
-                    val subText = if (state.isGameModeOn) "Oyun Modu Açık" else "aegis"
+                    val subText = if (state.isGameModeOn) "Oyun Modu Açık" else "QCYbutMOD"
 
                     val updatedNotification = buildNotification(
                         content = content,
@@ -91,7 +104,7 @@ class QcyBackgroundService : Service() {
                     val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
                     manager.notify(NOTIFICATION_ID, updatedNotification)
                 } else {
-                    val title = "${state.modelName.ifBlank { "aegis QCY" }} • Bağlı Değil"
+                    val title = "${state.modelName.ifBlank { "QCYbutMOD" }} • Bağlı Değil"
                     val content = "Sol: --  •  Sağ: --  •  Kutu: --"
                     val subText = "Bağlantı Kesildi"
 
@@ -223,7 +236,7 @@ class QcyBackgroundService : Service() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel(
                 CHANNEL_ID,
-                "aegis QCY Cihaz Durumu",
+                "QCYbutMOD Cihaz Durumu",
                 NotificationManager.IMPORTANCE_LOW
             ).apply {
                 description = "Bağlı QCY kulaklık durumu, anlık pil seviyeleri ve hızlı donanım kontrolleri"

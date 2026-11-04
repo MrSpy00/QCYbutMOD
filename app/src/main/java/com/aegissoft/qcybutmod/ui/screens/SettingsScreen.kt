@@ -23,11 +23,13 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import android.content.Intent
 import android.widget.Toast
+import com.aegissoft.qcybutmod.BuildConfig
 import com.aegissoft.qcybutmod.core.audio.AegisVoiceAssistant
 import com.aegissoft.qcybutmod.core.audio.VoiceSettings
 import com.aegissoft.qcybutmod.core.audio.VoiceSource
 import com.aegissoft.qcybutmod.core.bluetooth.BleConnectionManager
 import com.aegissoft.qcybutmod.core.net.PanelRepository
+import com.aegissoft.qcybutmod.core.utils.CrashReporter
 import com.aegissoft.qcybutmod.core.utils.AegisLogger
 import com.aegissoft.qcybutmod.ui.components.AegisCard
 import com.aegissoft.qcybutmod.ui.theme.*
@@ -995,7 +997,7 @@ fun SettingsScreen(
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        text = "aegis QCYbutMOD v1.1.0",
+                        text = "QCYbutMOD v${BuildConfig.VERSION_NAME}",
                         color = TextPrimary,
                         fontWeight = FontWeight.Bold,
                         fontSize = 14.sp
@@ -1014,6 +1016,39 @@ fun SettingsScreen(
                     color = TextTertiary,
                     fontSize = 11.sp
                 )
+                Spacer(modifier = Modifier.height(6.dp))
+                Text(
+                    text = "Paylaşılıp yüklenen APK debug imzalıdır. Bu paketi güncellemek için mevcut sürümü önce kaldırıp yeni sürümü kurun.",
+                    color = TextTertiary,
+                    fontSize = 10.sp
+                )
+                if (CrashReporter.lastCrashFile(context) != null) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    OutlinedButton(
+                        onClick = {
+                            CrashReporter.shareIntent(context)?.let {
+                                context.startActivity(Intent.createChooser(it, "Hata kaydını paylaş"))
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        border = BorderStroke(1.dp, WarningAmber),
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = WarningAmber)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.BugReport,
+                            contentDescription = null,
+                            tint = WarningAmber,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "Hata kaydını paylaş",
+                            color = WarningAmber,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
+                }
             }
         }
     }
