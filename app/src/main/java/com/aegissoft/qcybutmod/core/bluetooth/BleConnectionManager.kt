@@ -50,6 +50,30 @@ class BleConnectionManager private constructor(private val appContext: Context) 
         get() = bluetoothManager?.adapter
 
     private val macCachePrefs = appContext.getSharedPreferences(PREFS_MAC_CACHE, Context.MODE_PRIVATE)
+    private val actionMemory = ActionMemory(appContext)
+    val actionHistory: StateFlow<List<ActionSnapshot>> = actionMemory.history
+    val lastAction: StateFlow<ActionSnapshot?> = actionMemory.lastAction
+    val syncInfo: StateFlow<SyncInfo> = actionMemory.syncInfo
+
+    fun clearActionHistory() = actionMemory.clear()
+
+    private fun gateFeature(feature: String): Boolean {
+        val state = _deviceState.value
+        return when (val r = FeatureGate.requireConnected(state, feature)) {
+            FeatureGate.GateResult.Allowed -> {
+                actionMemory.record(feature, state.modelName, success = true)
+                true
+            }
+            is FeatureGate.GateResult.Blocked -> {
+                AegisLogger.w(TAG, "Blok: $feature — kulaklık bağlı değil")
+                actionMemory.record(feature, state.modelName, success = false, detail = r.reason)
+                mainHandler.post {
+                    android.widget.Toast.makeText(appContext, r.reason, android.widget.Toast.LENGTH_LONG).show()
+                }
+                false
+            }
+        }
+    }
     private val coroutineScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private val mainHandler = Handler(Looper.getMainLooper())
 
@@ -1595,6 +1619,8 @@ class BleConnectionManager private constructor(private val appContext: Context) 
                 )
             }
 
+            actionMemory.markSynced(_deviceState.value.vendorId, _deviceState.value.firmwareVersion)
+
             // Subscribe to notifications on 0000A001 RX characteristics first, then any secondary RX characteristics
             resubscribeAllNotifications(gatt)
 
@@ -2068,6 +2094,7 @@ class BleConnectionManager private constructor(private val appContext: Context) 
         level: Int = _deviceState.value.ancLevel,
         transLevel: Int = _deviceState.value.transparencyLevel
     ) {
+        if (!gateFeature("ANC modu")) return
         val safeLevel = level.coerceIn(1, 3)
         _deviceState.update {
             it.copy(
@@ -2096,6 +2123,7 @@ class BleConnectionManager private constructor(private val appContext: Context) 
     }
 
     fun setAdaptiveAiAnc(enabled: Boolean) {
+        if (!gateFeature("AI adaptif ANC")) return
         val targetScene = if (enabled) AncSubScene.ADAPTIVE else AncSubScene.NOISY
         _deviceState.update {
             it.copy(
@@ -2112,6 +2140,7 @@ class BleConnectionManager private constructor(private val appContext: Context) 
     }
 
     fun setGameMode(enabled: Boolean) {
+        if (!gateFeature("Oyun modu")) return
         _deviceState.update { it.copy(isGameModeOn = enabled) }
         sendCommand(QcyProtocol.createGameModeCommand(enabled))
         scheduleStateVerification(QcyProtocol.CMD_GAME_MODE)
@@ -2120,6 +2149,7 @@ class BleConnectionManager private constructor(private val appContext: Context) 
     }
 
     fun setLdac(enabled: Boolean) {
+        if (!gateFeature("LDAC codec")) return
         _deviceState.update { it.copy(isLdacOn = enabled) }
         sendCommand(QcyProtocol.createLdacCommand(enabled))
         scheduleStateVerification(QcyProtocol.CMD_LDAC_SWITCH)
@@ -2128,6 +2158,7 @@ class BleConnectionManager private constructor(private val appContext: Context) 
     }
 
     fun setInEarDetection(enabled: Boolean) {
+        if (!gateFeature("Kulak algılama")) return
         _deviceState.update { it.copy(isInEarDetectionOn = enabled) }
         // Send both V2 Peidai (0x2C / 44) and V1 Ruer (0x06) commands so all QCY firmware versions respond
         sendCommand(QcyProtocol.createPeidaiCommand(enabled))
@@ -2138,6 +2169,7 @@ class BleConnectionManager private constructor(private val appContext: Context) 
     }
 
     fun setSleepMode(enabled: Boolean) {
+        if (!gateFeature("Uyku modu")) return
         _deviceState.update { it.copy(isSleepModeOn = enabled) }
         sendCommand(QcyProtocol.createSleepModeCommand(enabled))
         scheduleStateVerification(QcyProtocol.CMD_SLEEP_MODE)
@@ -2146,6 +2178,7 @@ class BleConnectionManager private constructor(private val appContext: Context) 
     }
 
     fun setMultipoint(enabled: Boolean) {
+        if (!gateFeature("Çoklu bağlantı")) return
         _deviceState.update { it.copy(isMultipointOn = enabled) }
         sendCommand(QcyProtocol.createMultipointCommand(enabled))
         scheduleStateVerification(QcyProtocol.CMD_MULTIPOINT_CONTROL)
@@ -2155,6 +2188,7 @@ class BleConnectionManager private constructor(private val appContext: Context) 
     }
 
     fun refreshMultipointDevices() {
+        if (!gateFeature("Çoklu bağlantı listesi")) return
         // Resmi app requestPhoneInfo: FE+0x24 (multipoint durumu) VE FE+0x4D (liste) birlikte sorgulanır
         sendCommand(QcyProtocol.packFrame(QcyProtocol.CMD_REQUEST_ALL_DATA, QcyProtocol.CMD_MULTIPOINT_CONTROL))
         sendCommand(QcyProtocol.packFrame(QcyProtocol.CMD_REQUEST_ALL_DATA, QcyProtocol.CMD_MULTIPOINT_QUERY))
@@ -2168,6 +2202,7 @@ class BleConnectionManager private constructor(private val appContext: Context) 
     }
 
     fun setPhoneBtAction(connectPhone: Boolean, phoneMac: String, phoneName: String = "") {
+        if (!gateFeature("Telefon bağlantı eylemi")) return
         val cmd = QcyProtocol.createPhoneBtActionCommand(if (connectPhone) 1 else 0, phoneMac)
         if (cmd != null) {
             sendCommand(cmd)
@@ -2179,11 +2214,13 @@ class BleConnectionManager private constructor(private val appContext: Context) 
     }
 
     fun setChannelBalance(balance: Int) {
+        if (!gateFeature("Kanal dengesi")) return
         _deviceState.update { it.copy(channelBalance = balance) }
         sendCommand(QcyProtocol.createChannelBalanceCommand(balance))
     }
 
     fun setPromptVolume(volume: Int) {
+        if (!gateFeature("Sesli bildirim seviyesi")) return
         // Firmware tone must stay at 0 unless the user explicitly chose the English
         // firmware voice - the slider is disabled otherwise, this is the hard guard.
         if (VoiceSettings.getVoiceSource(appContext) != VoiceSource.FIRMWARE_EN) {
@@ -2201,6 +2238,7 @@ class BleConnectionManager private constructor(private val appContext: Context) 
     }
 
     fun applyVoiceSource(source: VoiceSource) {
+        if (!gateFeature("Ses kaynağı")) return
         VoiceSettings.setVoiceSource(appContext, source)
         when (source) {
             VoiceSource.AEGIS_TR, VoiceSource.OFF -> {
@@ -2248,6 +2286,7 @@ class BleConnectionManager private constructor(private val appContext: Context) 
     }
 
     fun triggerFindBeep(left: Boolean, right: Boolean, sendFirmware: Boolean = true) {
+        if (!gateFeature("Bulma sinyali")) return
         val start = left || right
         if (start) {
             com.aegissoft.qcybutmod.core.audio.EarbudAudioLocator.startBeep(left, right, appContext)
@@ -2262,6 +2301,7 @@ class BleConnectionManager private constructor(private val appContext: Context) 
     }
 
     fun startFitTest() {
+        if (!gateFeature("Uyum testi")) return
         sendCommand(QcyProtocol.createFitTestCommand(true))
     }
 
@@ -2270,6 +2310,7 @@ class BleConnectionManager private constructor(private val appContext: Context) 
     }
 
     fun setTouchGesture(keyId: Int, functionId: Int, earbudName: String = "", gestureName: String = "") {
+        if (!gateFeature("Dokunma hareketi")) return
         _deviceState.update { current ->
             val newMap = current.keyMappings.toMutableMap()
             newMap[keyId] = functionId
@@ -2316,6 +2357,7 @@ class BleConnectionManager private constructor(private val appContext: Context) 
         rightBands: List<EqBand>,
         stereoLinked: Boolean
     ) {
+        if (!gateFeature("Ekolayzır")) return
         val eqType = when (presetId) {
             "flat" -> 1
             "pop" -> 2
@@ -2360,6 +2402,7 @@ class BleConnectionManager private constructor(private val appContext: Context) 
     }
 
     fun sendParametricEqDirect(eqPayload: ByteArray) {
+        if (!gateFeature("Ekolayzır")) return
         val ch = eqChar
         if (ch != null) {
             val payloadWithHeader = if (eqPayload.size == 10) {
@@ -2370,12 +2413,14 @@ class BleConnectionManager private constructor(private val appContext: Context) 
     }
 
     fun sendChannelEq(isLeft: Boolean, gains: ByteArray) {
+        if (!gateFeature("Kanal ekolayzırı")) return
         val cmdId = if (isLeft) QcyProtocol.CMD_LEFT_CHANNEL_EQ else QcyProtocol.CMD_RIGHT_CHANNEL_EQ
         val packet = QcyProtocol.packFrame(cmdId, *gains)
         sendCommand(packet)
     }
 
     fun factoryReset() {
+        if (!gateFeature("Fabrika ayarları")) return
         sendCommand(QcyProtocol.createFactoryResetCommand())
         sendCommand(QcyProtocol.createResetDefaultCommand())
         com.aegissoft.qcybutmod.core.audio.AegisVoiceAssistant.getInstance(appContext)
@@ -2383,6 +2428,7 @@ class BleConnectionManager private constructor(private val appContext: Context) 
     }
 
     fun renameDevice(newName: String) {
+        if (!gateFeature("Cihaz adı")) return
         if (newName.isBlank()) return
         _deviceState.update { it.copy(modelName = newName) }
         sendCommand(QcyProtocol.createDeviceRenameCommand(newName))

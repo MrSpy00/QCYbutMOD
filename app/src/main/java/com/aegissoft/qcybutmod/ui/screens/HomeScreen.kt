@@ -52,6 +52,7 @@ fun HomeScreen(
     val eqBands = remember(state.vendorId) { ProductDatabase.getCapabilities(state.vendorId).eqBands }
     val isScanning by bleManager.isScanning.collectAsState()
     val discoveredList by bleManager.discoveredDevices.collectAsState()
+    val lastAction by bleManager.lastAction.collectAsState()
     val theme = LocalAppThemeColor.current
     val haptic = LocalHapticFeedback.current
 
@@ -401,6 +402,17 @@ fun HomeScreen(
                                 }
                             }
                         }
+                    }
+
+                    lastAction?.let { la ->
+                        Spacer(modifier = Modifier.height(10.dp))
+                        Text(
+                            text = "Son işlem: ${la.feature} • " + java.text.SimpleDateFormat("HH:mm", java.util.Locale.getDefault()).format(java.util.Date(la.attemptedAt)),
+                            color = TextTertiary,
+                            fontSize = 10.sp,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
                     }
 
                     if (!state.isConnected) {

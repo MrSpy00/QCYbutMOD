@@ -42,6 +42,7 @@ fun SettingsScreen(
     onBack: () -> Unit
 ) {
     val state by bleManager.deviceState.collectAsState()
+    val actionHistory by bleManager.actionHistory.collectAsState()
     val panelStatus by PanelRepository.status.collectAsState()
     val theme = LocalAppThemeColor.current
     val haptic = LocalHapticFeedback.current
@@ -976,6 +977,119 @@ fun SettingsScreen(
                             color = TextPrimary,
                             fontSize = 12.sp,
                             fontWeight = FontWeight.SemiBold
+                        )
+                    }
+                }
+            }
+        }
+
+        // Son Hareketler (Action Memory)
+        item {
+            AegisCard(modifier = Modifier.fillMaxWidth()) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.History,
+                        contentDescription = null,
+                        tint = theme.primary,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "Son Hareketler",
+                            color = TextPrimary,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 14.sp
+                        )
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = "Kulaklıkla yaptığınız son işlemler (en yeni en üstte)",
+                            color = TextSecondary,
+                            fontSize = 11.sp
+                        )
+                    }
+                    IconButton(
+                        onClick = {
+                            bleManager.clearActionHistory()
+                            Toast.makeText(context, "Hareket geçmişi temizlendi", Toast.LENGTH_SHORT).show()
+                        },
+                        modifier = Modifier.size(36.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.DeleteSweep,
+                            contentDescription = "Geçmişi temizle",
+                            tint = TextSecondary,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+                }
+                Spacer(modifier = Modifier.height(10.dp))
+                if (actionHistory.isEmpty()) {
+                    Text(
+                        text = "Henüz kayıtlı hareket yok.",
+                        color = TextTertiary,
+                        fontSize = 12.sp
+                    )
+                } else {
+                    actionHistory.take(8).forEach { entry ->
+                        val timeText = java.text.SimpleDateFormat("HH:mm", java.util.Locale.getDefault()).format(java.util.Date(entry.attemptedAt))
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = timeText,
+                                color = TextTertiary,
+                                fontSize = 11.sp,
+                                modifier = Modifier.width(38.dp)
+                            )
+                            Icon(
+                                imageVector = if (entry.success) Icons.Rounded.CheckCircle else Icons.Rounded.Cancel,
+                                contentDescription = if (entry.success) "Başarılı" else "Başarısız",
+                                tint = if (entry.success) SuccessGreen else DangerRed,
+                                modifier = Modifier.size(14.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = entry.feature,
+                                    color = TextPrimary,
+                                    fontWeight = FontWeight.SemiBold,
+                                    fontSize = 12.sp,
+                                    maxLines = 1,
+                                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                                )
+                                Text(
+                                    text = entry.targetDevice,
+                                    color = TextTertiary,
+                                    fontSize = 10.sp,
+                                    maxLines = 1,
+                                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                                )
+                                if (entry.detail.isNotBlank()) {
+                                    Text(
+                                        text = entry.detail,
+                                        color = TextTertiary,
+                                        fontSize = 10.sp,
+                                        maxLines = 2,
+                                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                                    )
+                                }
+                            }
+                        }
+                    }
+                    if (actionHistory.size > 8) {
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = "+${actionHistory.size - 8} hareket daha",
+                            color = TextTertiary,
+                            fontSize = 10.sp,
+                            modifier = Modifier.padding(start = 46.dp)
                         )
                     }
                 }
