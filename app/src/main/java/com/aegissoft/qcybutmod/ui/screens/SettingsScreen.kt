@@ -28,6 +28,7 @@ import com.aegissoft.qcybutmod.core.audio.AegisVoiceAssistant
 import com.aegissoft.qcybutmod.core.audio.VoiceSettings
 import com.aegissoft.qcybutmod.core.audio.VoiceSource
 import com.aegissoft.qcybutmod.core.bluetooth.BleConnectionManager
+import com.aegissoft.qcybutmod.core.models.ProductDatabase
 import com.aegissoft.qcybutmod.core.net.PanelRepository
 import com.aegissoft.qcybutmod.core.utils.CrashReporter
 import com.aegissoft.qcybutmod.core.utils.AegisLogger
@@ -54,6 +55,16 @@ fun SettingsScreen(
     val context = androidx.compose.ui.platform.LocalContext.current
     // Hoisted: the Prompt Tone card (separate LazyColumn item) also gates its slider on this.
     var voiceSource by remember { mutableStateOf(VoiceSettings.getVoiceSource(context)) }
+    var modelMenuExpanded by remember { mutableStateOf(false) }
+    val applyForcedModel: (Int?) -> Unit = { id ->
+        bleManager.applyForcedModel(id)
+        modelMenuExpanded = false
+        Toast.makeText(
+            context,
+            if (id == null) "Otomatik model algılama" else "Model: ${ProductDatabase.getProduct(id).title}",
+            Toast.LENGTH_SHORT
+        ).show()
+    }
 
     LazyColumn(
         modifier = Modifier
@@ -698,6 +709,102 @@ fun SettingsScreen(
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 12.sp
                             )
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(10.dp))
+
+                // Manuel model seçimi: otomatik algılama / genel QCY / ürün listesi
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = DarkSurfaceVariant,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 14.dp, vertical = 12.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "Kulaklık Modeli",
+                                color = TextSecondary,
+                                fontSize = 11.sp
+                            )
+                            Spacer(modifier = Modifier.height(2.dp))
+                            val effectiveVid = ProductDatabase.forcedVendorId ?: state.vendorId
+                            val effectiveProduct = ProductDatabase.getProduct(effectiveVid)
+                            Text(
+                                text = effectiveProduct.title,
+                                color = TextPrimary,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 14.sp,
+                                maxLines = 1,
+                                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                            )
+                            if (effectiveProduct.title.startsWith("QCY Aygıtı (0x")) {
+                                Spacer(modifier = Modifier.height(2.dp))
+                                Text(
+                                    text = "Model otomatik tanınamadı — genel özelliklerle çalışıyor (doğrulanmadı)",
+                                    color = WarningAmber,
+                                    fontSize = 10.sp
+                                )
+                            } else if (ProductDatabase.forcedVendorId != null) {
+                                Spacer(modifier = Modifier.height(2.dp))
+                                Text(
+                                    text = "Manuel seçim aktif (otomatik algılana dönmek için Otomatik seçin)",
+                                    color = TextTertiary,
+                                    fontSize = 10.sp
+                                )
+                            }
+                        }
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Box {
+                            Button(
+                                onClick = { modelMenuExpanded = true },
+                                colors = ButtonDefaults.buttonColors(containerColor = theme.primary),
+                                shape = RoundedCornerShape(10.dp),
+                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+                                modifier = Modifier.height(34.dp)
+                            ) {
+                                Text(
+                                    text = "Değiştir",
+                                    color = OledBlack,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 12.sp
+                                )
+                            }
+                            DropdownMenu(
+                                expanded = modelMenuExpanded,
+                                onDismissRequest = { modelMenuExpanded = false }
+                            ) {
+                                DropdownMenuItem(
+                                    text = { Text("Otomatik (algılana)", fontSize = 13.sp) },
+                                    onClick = { applyForcedModel(null) }
+                                )
+                                DropdownMenuItem(
+                                    text = { Text("Genel QCY Aygıtı", fontSize = 13.sp) },
+                                    onClick = { applyForcedModel(0) }
+                                )
+                                ProductDatabase.getAllProducts()
+                                    .sortedBy { it.title }
+                                    .forEach { p ->
+                                        DropdownMenuItem(
+                                            text = {
+                                                Text(
+                                                    text = p.title + if (p.subTitle.isNotEmpty()) " • ${p.subTitle}" else "",
+                                                    fontSize = 13.sp,
+                                                    maxLines = 1,
+                                                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                                                )
+                                            },
+                                            onClick = { applyForcedModel(p.vendorId) }
+                                        )
+                                    }
+                            }
                         }
                     }
                 }

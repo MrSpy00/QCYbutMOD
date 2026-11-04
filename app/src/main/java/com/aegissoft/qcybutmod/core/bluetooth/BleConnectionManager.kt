@@ -64,6 +64,12 @@ class BleConnectionManager private constructor(private val appContext: Context) 
 
     fun clearActionHistory() = actionMemory.clear()
 
+    // Manuel model seçimi: yetenek katmanını değiştir + UI önbelleklerini tazele (modelUiVersion++)
+    fun applyForcedModel(forced: Int?) {
+        com.aegissoft.qcybutmod.core.models.ProductDatabase.setForcedVendorId(forced, appContext)
+        _deviceState.update { it.copy(modelUiVersion = it.modelUiVersion + 1) }
+    }
+
     fun recordFeatureAction(feature: String, success: Boolean, detail: String = "") =
         actionMemory.record(feature, _deviceState.value.modelName, success, detail)
 

@@ -42,7 +42,7 @@ fun GestureScreen(
     val theme = LocalAppThemeColor.current
     val state by bleManager.deviceState.collectAsState()
     var selectedEarbud by remember { mutableStateOf(0) } // 0 = Left, 1 = Right
-    val capabilities = remember(state.vendorId) { ProductDatabase.getCapabilities(state.vendorId) }
+    val capabilities = remember(state.vendorId, state.modelUiVersion) { ProductDatabase.getCapabilities(state.vendorId) }
     val context = androidx.compose.ui.platform.LocalContext.current
     val assistantAllowed = remember(context) {
         PromptMutePolicy.shouldAllowVoiceAssistantGesture(VoiceSettings.getVoiceSource(context).id)

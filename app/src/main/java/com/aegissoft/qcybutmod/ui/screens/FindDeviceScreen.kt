@@ -46,7 +46,7 @@ fun FindDeviceScreen(
     var patternJob by remember { mutableStateOf<Job?>(null) }
     val scope = rememberCoroutineScope()
     val currentGain by com.aegissoft.qcybutmod.core.audio.EarbudAudioLocator.currentVolumeGain.collectAsState()
-    val capabilities = remember(state.vendorId) { ProductDatabase.getCapabilities(state.vendorId) }
+    val capabilities = remember(state.vendorId, state.modelUiVersion) { ProductDatabase.getCapabilities(state.vendorId) }
 
     DisposableEffect(Unit) {
         bleManager.startRssiPolling()

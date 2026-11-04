@@ -36,7 +36,7 @@ fun MultipointScreen(
     val context = LocalContext.current
     val queryStatus by bleManager.multipointQueryStatus.collectAsState()
     val localBonded = remember(state.isConnected) { bleManager.localBondedDevices() }
-    val hasMultipoint = remember(state.vendorId) {
+    val hasMultipoint = remember(state.vendorId, state.modelUiVersion) {
         ProductDatabase.getCapabilities(state.vendorId).hasMultipoint
     }
 

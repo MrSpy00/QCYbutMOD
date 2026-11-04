@@ -18,6 +18,11 @@ data class ProductInfo(
 object ProductDatabase {
     private val memoryDb = HashMap<Int, ProductInfo>()
 
+    // Manuel model seçimi: null=otomatik algılama, 0=Genel QCY Aygıtı (bilinmeyen yol)
+    @Volatile
+    var forcedVendorId: Int? = null
+        private set
+
     init {
         // Built-in high priority device definitions
         register(ProductInfo(19786, "QCY MeloBuds Pro", "HT08"))
@@ -40,6 +45,11 @@ object ProductDatabase {
     }
 
     fun initFromRaw(context: Context) {
+        try {
+            forcedVendorId = context.getSharedPreferences("qcy_model_prefs", Context.MODE_PRIVATE)
+                .getInt("forced", -1).takeIf { it >= 0 }
+        } catch (_: Exception) {
+        }
         try {
             val inputStream = context.resources.openRawResource(R.raw.products)
             val reader = InputStreamReader(inputStream)
@@ -107,8 +117,24 @@ object ProductDatabase {
         return vendorId in listOf(19786, 19785, 19790, 16849, 16850, 23877)
     }
 
-    fun getCapabilities(vendorId: Int): DeviceCapabilities =
-        CapabilityParser.parse(vendorId, memoryDb[vendorId]?.features, isLdacSupported(vendorId))
+    fun getCapabilities(vendorId: Int): DeviceCapabilities {
+        val eff = forcedVendorId ?: vendorId
+        val product = memoryDb[eff] ?: return CapabilityParser.unknownModel(eff, isLdacSupported(eff))
+        return CapabilityParser.parse(eff, product.features, isLdacSupported(eff))
+    }
 
     fun getModelId(vendorId: Int): Int = memoryDb[vendorId]?.modelId ?: 21020
+
+    fun setForcedVendorId(id: Int?) {
+        forcedVendorId = id
+    }
+
+    fun setForcedVendorId(id: Int?, context: Context) {
+        forcedVendorId = id
+        try {
+            context.getSharedPreferences("qcy_model_prefs", Context.MODE_PRIVATE)
+                .edit().putInt("forced", id ?: -1).apply()
+        } catch (_: Exception) {
+        }
+    }
 }

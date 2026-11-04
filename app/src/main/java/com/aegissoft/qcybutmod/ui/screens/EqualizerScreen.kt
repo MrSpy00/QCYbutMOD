@@ -34,7 +34,7 @@ fun EqualizerScreen(
     onBack: () -> Unit
 ) {
     val state by bleManager.deviceState.collectAsState()
-    val eqBands = remember(state.vendorId) { ProductDatabase.getCapabilities(state.vendorId).eqBands }
+    val eqBands = remember(state.vendorId, state.modelUiVersion) { ProductDatabase.getCapabilities(state.vendorId).eqBands }
     val theme = LocalAppThemeColor.current
     val haptic = LocalHapticFeedback.current
     val context = LocalContext.current

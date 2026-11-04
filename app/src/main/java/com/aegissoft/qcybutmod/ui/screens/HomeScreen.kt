@@ -18,6 +18,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
@@ -49,7 +50,7 @@ fun HomeScreen(
     onNavigate: (String) -> Unit
 ) {
     val state by bleManager.deviceState.collectAsState()
-    val eqBands = remember(state.vendorId) { ProductDatabase.getCapabilities(state.vendorId).eqBands }
+    val eqBands = remember(state.vendorId, state.modelUiVersion) { ProductDatabase.getCapabilities(state.vendorId).eqBands }
     val isScanning by bleManager.isScanning.collectAsState()
     val discoveredList by bleManager.discoveredDevices.collectAsState()
     val lastAction by bleManager.lastAction.collectAsState()
@@ -163,13 +164,18 @@ fun HomeScreen(
             onDispose { noiseMonitor.stop() }
         }
 
-        LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(horizontal = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
-            contentPadding = PaddingValues(top = 4.dp, bottom = 32.dp)
-        ) {
+        // Tablet/dar ekran: >600dp genişlikte içerik 780dp ile ortalanır
+        BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+            val wide = maxWidth > 600.dp
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxHeight()
+                    .align(Alignment.TopCenter)
+                    .then(if (wide) Modifier.widthIn(max = 780.dp) else Modifier)
+                    .padding(horizontal = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+                contentPadding = PaddingValues(top = 4.dp, bottom = 32.dp)
+            ) {
             if (isOfficialInstalled && showOfficialNotice) {
                 item {
                     Surface(
@@ -537,8 +543,8 @@ fun HomeScreen(
                 }
             }
 
-            // ANC Master Control Section
-            if (ProductDatabase.getCapabilities(state.vendorId).hasAnc) item {
+            // ANC Master Control Section — model desteklemiyorsa gizlemek yerine görünür + kapalı neden göster
+            item {
                 AegisCard(modifier = Modifier.fillMaxWidth()) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -565,6 +571,14 @@ fun HomeScreen(
                     }
 
                     Spacer(modifier = Modifier.height(14.dp))
+
+                    if (!ProductDatabase.getCapabilities(state.vendorId).hasAnc) {
+                        Text(
+                            text = "Bu kulaklık modelinde ANC donanımı bulunmuyor — kontroller gizlendi.",
+                            color = TextTertiary,
+                            fontSize = 12.sp
+                        )
+                    } else {
 
                     // 3-way Segmented Button Row
                     Row(
@@ -785,6 +799,8 @@ fun HomeScreen(
                             )
                         }
                     }
+
+                    }
                 }
             }
 
@@ -808,21 +824,22 @@ fun HomeScreen(
                             }
                         )
 
-                        if (ProductDatabase.getCapabilities(state.vendorId).hasLdac) {
-                            QuickToggleCard(
-                                icon = Icons.Rounded.HighQuality,
-                                title = "LDAC HD Ses",
-                                subtitle = if (state.isLdacOn) "Açık • 990 kbps Hi-Res" else "Kapalı • AAC/SBC",
-                                isActive = state.isLdacOn,
-                                themeColor = theme.primary,
-                                warning = "Uyarı: Kulaklık kendiliğinden kapanıp açılabilir",
-                                modifier = Modifier.weight(1f),
-                                onClick = {
-                                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                    bleManager.setLdac(!state.isLdacOn)
-                                }
-                            )
-                        }
+                        val ldacSupported = ProductDatabase.getCapabilities(state.vendorId).hasLdac
+                        QuickToggleCard(
+                            icon = Icons.Rounded.HighQuality,
+                            title = "LDAC HD Ses",
+                            subtitle = if (!ldacSupported) "Bu kulaklık modelinde desteklenmiyor"
+                            else if (state.isLdacOn) "Açık • 990 kbps Hi-Res" else "Kapalı • AAC/SBC",
+                            isActive = state.isLdacOn && ldacSupported,
+                            themeColor = theme.primary,
+                            warning = if (ldacSupported) "Uyarı: Kulaklık kendiliğinden kapanıp açılabilir" else null,
+                            modifier = Modifier.weight(1f),
+                            enabled = ldacSupported,
+                            onClick = {
+                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                bleManager.setLdac(!state.isLdacOn)
+                            }
+                        )
                     }
 
                     Row(
@@ -859,10 +876,11 @@ fun HomeScreen(
                 }
             }
 
-            // Navigation Menu Cards with Premium Vector Icons
+            // Navigation Menu Cards with Premium Vector Icons (>600dp: 2 sütun, dar: tek sütun)
             item {
-                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                val navContent: @Composable (Modifier) -> Unit = { m ->
                     NavCard(
+                        modifier = m,
                         icon = Icons.Rounded.GraphicEq,
                         title = "$eqBands-Bant Parametrik Ekolayzer",
                         subtitle = "Sol/Sağ bağımsız kanal profilleri, biquad eğrileri",
@@ -874,6 +892,7 @@ fun HomeScreen(
                     )
 
                     NavCard(
+                        modifier = m,
                         icon = Icons.Rounded.TouchApp,
                         title = "Dokunmatik Jest Eşleme",
                         subtitle = "Tek, çift ve üç dokunma işlevleri",
@@ -885,6 +904,7 @@ fun HomeScreen(
                     )
 
                     NavCard(
+                        modifier = m,
                         icon = Icons.Rounded.Headphones,
                         title = "Kulak Uyum & Akustik Testi",
                         subtitle = "Donanımsal mikrofon akustik sızdırmazlık analizi",
@@ -896,6 +916,7 @@ fun HomeScreen(
                     )
 
                     NavCard(
+                        modifier = m,
                         icon = Icons.Rounded.Radar,
                         title = "Kulaklıklarımı Bul",
                         subtitle = "BLE RSSI radar takibi & yüksek sesli bip alarmı",
@@ -907,6 +928,7 @@ fun HomeScreen(
                     )
 
                     NavCard(
+                        modifier = m,
                         icon = Icons.Rounded.Devices,
                         title = "Çift Cihaz Bağlantısı (Multipoint)",
                         subtitle = if (state.isMultipointOn) "Açık • Eşzamanlı iki ses kaynağı yönetimi" else "Kapalı • Tek cihaz bağlantısı",
@@ -918,6 +940,7 @@ fun HomeScreen(
                     )
 
                     NavCard(
+                        modifier = m,
                         icon = Icons.Rounded.Translate,
                         title = "AI Canlı Çeviri",
                         subtitle = "Çift dilli anlık konuşma çevirisi & kulaklığa sesli okuma",
@@ -928,7 +951,22 @@ fun HomeScreen(
                         }
                     )
                 }
+                if (wide) {
+                    FlowRow(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp),
+                        maxItemsInEachRow = 2
+                    ) {
+                        navContent(Modifier.fillMaxWidth(0.485f))
+                    }
+                } else {
+                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        navContent(Modifier.fillMaxWidth())
+                    }
+                }
             }
+        }
         }
     }
 
@@ -971,13 +1009,14 @@ fun QuickToggleCard(
     themeColor: Color,
     modifier: Modifier = Modifier,
     warning: String? = null,
+    enabled: Boolean = true,
     onClick: () -> Unit
 ) {
     AegisCard(
-        modifier = modifier.defaultMinSize(minHeight = 80.dp),
+        modifier = modifier.defaultMinSize(minHeight = 80.dp).alpha(if (enabled) 1f else 0.55f),
         contentPadding = PaddingValues(horizontal = 12.dp, vertical = 12.dp),
         hasGlow = isActive,
-        onClick = onClick
+        onClick = if (enabled) onClick else null
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -1036,6 +1075,7 @@ fun QuickToggleCard(
 
 @Composable
 fun NavCard(
+    modifier: Modifier = Modifier,
     icon: ImageVector,
     title: String,
     subtitle: String,
@@ -1043,7 +1083,7 @@ fun NavCard(
     onClick: () -> Unit
 ) {
     AegisCard(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = modifier,
         onClick = onClick
     ) {
         Row(

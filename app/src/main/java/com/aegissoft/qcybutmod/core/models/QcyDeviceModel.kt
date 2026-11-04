@@ -57,7 +57,9 @@ data class QcyDeviceState(
     val pairedPhones: List<com.aegissoft.qcybutmod.core.bluetooth.QcyProtocol.ConnectedPhone> = emptyList(),
     val keyMappings: Map<Int, Int> = emptyMap(),
     val eqPresetId: String = "flat",
-    val eqGains: List<Float> = List(10) { 0f }
+    val eqGains: List<Float> = List(10) { 0f },
+    // Manuel model seçimi değişince UI yetenek önbelleklerini tazelemek için (StateFlow eşitlik atlamasın diye)
+    val modelUiVersion: Int = 0
 )
 
 data class TouchGestureAction(

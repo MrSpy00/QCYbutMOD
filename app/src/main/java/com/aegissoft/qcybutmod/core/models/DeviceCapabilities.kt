@@ -48,6 +48,19 @@ object CapabilityParser {
         features["settings"] as? List<Any?> ?: emptyList()
 
     private fun cmdidOf(entry: Any?): Int? = ((entry as? Map<*, *>)?.get("cmdid") as? Number)?.toInt()
+
+    // Tanınamayan model: koruyucu varsayılan — her özellik açık denenir, LDAC yalnızca bilinen listeyle
+    fun unknownModel(vendorId: Int, ldacSupported: Boolean): DeviceCapabilities =
+        DeviceCapabilities(
+            vendorId = vendorId,
+            hasAnc = true,
+            hasLdac = ldacSupported,
+            hasMultipoint = true,
+            hasFind = true,
+            hasLongPress = true,
+            touchSides = TouchSides.BOTH,
+            eqBands = 10
+        )
 }
 
 fun DeviceCapabilities.longPressAvailable(keyMappings: Map<Int, Int>): Boolean =
