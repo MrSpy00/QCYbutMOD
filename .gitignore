@@ -1,16 +1,52 @@
-# Build artifacts
+# ==========================================
+# aegisSoft QCYbutMOD - Git Ignore Rules
+# ==========================================
+
+# Built application packages & binaries
+*.apk
+*.ap_
+*.aab
+*.dex
+*.class
+
+# Build artifacts & caches
 .gradle/
 build/
+app/build/
 .kotlin/
-local.properties
 *.iml
+.idea/
+.vscode/
+.superpowers/
 
-# Large reference artifacts (decompiled sources, logs, screenshots)
-tools/
-*.png
+# Local configuration & environment
+local.properties
+captures/
+.externalNativeBuild/
+.cxx/
+output-metadata.json
 
-# Release signing (never commit)
+# Release signing keys & private configs (CRITICAL: NEVER COMMIT)
 release/
 keystore.properties
 *.jks
 *.keystore
+*.p12
+*.key
+*.pem
+
+# Log files & crash dumps
+*.log
+*.hprof
+
+# Screenshots & raw media dumps at root
+*.png
+*.jpg
+*.jpeg
+*.mp4
+tools/
+
+# OS specific files
+.DS_Store
+Thumbs.db
+Desktop.ini

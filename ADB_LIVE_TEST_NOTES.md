@@ -2,7 +2,7 @@
 
 > Ortak çalışma notu: telefon kullanıcı ile birlikte kullanılıyor (log'da kullanıcının kendi tıklamaları da var).
 > Kanıt kaynağı: `adb shell run-as com.aegissoft.qcybutmod.debug cat files/qcy_debug.log` (AegisLogger) + screencap.
-> Cihaz: 192.168.0.160:40471 (Honor Magic PTP_N49, Android 16), kurulum: `com.aegissoft.qcybutmod.debug` (applicationId `.debug` suffix), APK 95.7MB, HEAD 87ccd86.
+> Cihaz: Honor Magic (PTP_N49, Android 16), kurulum: `com.aegissoft.qcybutmod.debug` (applicationId `.debug` suffix), APK 95.7MB, HEAD 87ccd86.
 > Gradle kapısı: `:app:testDebugUnitTest` 49/49 + `assembleDebug` BUILD SUCCESSFUL (17:45, UP-TO-DATE).
 
 ## Sonuç tablosu
