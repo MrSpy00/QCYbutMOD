@@ -22,8 +22,9 @@ import com.aegissoft.qcybutmod.core.bluetooth.PromptMutePolicy
 import com.aegissoft.qcybutmod.core.models.GestureFunctions
 import com.aegissoft.qcybutmod.core.models.ProductDatabase
 import com.aegissoft.qcybutmod.core.models.TouchSides
-import com.aegissoft.qcybutmod.core.models.longPressAvailable
 import com.aegissoft.qcybutmod.ui.components.AegisCard
+import android.widget.Toast
+import kotlinx.coroutines.delay
 import com.aegissoft.qcybutmod.ui.theme.*
 
 data class GestureConfig(
@@ -56,34 +57,46 @@ fun GestureScreen(
         bleManager.refreshKeyMappings()
     }
 
-    val hasLongPressRuntime = capabilities.longPressAvailable(state.keyMappings)
-
-    val leftGestures = remember(state.keyMappings, hasLongPressRuntime) {
+    val leftGestures = remember(state.keyMappings) {
         listOf(
             GestureConfig("Tek Dokunma", 1, state.keyMappings[1] ?: GestureFunctions.NONE),
             GestureConfig("Çift Dokunma", 3, state.keyMappings[3] ?: GestureFunctions.PLAY_PAUSE),
-            GestureConfig("Üç Dokunma", 5, state.keyMappings[5] ?: GestureFunctions.VOICE_ASSISTANT)
-        ) + if (hasLongPressRuntime) listOf(
-            // 0x2B tablosu keyId 7/8 canlı kanıtlandı; panel verisi yoksa CapabilityParser varsayılanı gösterir
+            GestureConfig("Üç Dokunma", 5, state.keyMappings[5] ?: GestureFunctions.VOICE_ASSISTANT),
+            // 0x2B tablosu keyId 7/8 canlı kanıtlandı; modelden bağımsız hep görünür (kullanıcı talebi)
             GestureConfig("Uzun Basma (2 sn)", 7, state.keyMappings[7] ?: GestureFunctions.NONE)
-        ) else emptyList()
+        )
     }
 
-    val rightGestures = remember(state.keyMappings, hasLongPressRuntime) {
+    val rightGestures = remember(state.keyMappings) {
         listOf(
             GestureConfig("Tek Dokunma", 2, state.keyMappings[2] ?: GestureFunctions.NONE),
             GestureConfig("Çift Dokunma", 4, state.keyMappings[4] ?: GestureFunctions.PLAY_PAUSE),
-            GestureConfig("Üç Dokunma", 6, state.keyMappings[6] ?: GestureFunctions.NEXT_TRACK)
-        ) + if (hasLongPressRuntime) listOf(
+            GestureConfig("Üç Dokunma", 6, state.keyMappings[6] ?: GestureFunctions.NEXT_TRACK),
             GestureConfig("Uzun Basma (2 sn)", 8, state.keyMappings[8] ?: GestureFunctions.NONE)
-        ) else emptyList()
+        )
     }
 
     var dialogGestureTarget by remember { mutableStateOf<GestureConfig?>(null) }
+    // Uzun basma write → 350ms readback sonrası firmware farklı değer dönerse kullanıcıya söyle
+    var longPressCheck by remember { mutableStateOf<Pair<Int, Int>?>(null) }
+
+    LaunchedEffect(longPressCheck) {
+        val (keyId, requested) = longPressCheck ?: return@LaunchedEffect
+        delay(1500)
+        if (state.keyMappings[keyId] != requested) {
+            Toast.makeText(
+                context,
+                "Uzun basma ayarı bu modelde desteklenmiyor olabilir — kulaklık eski değeri geri döndürdü.",
+                Toast.LENGTH_LONG
+            ).show()
+        }
+        longPressCheck = null
+    }
 
     fun updateGesture(config: GestureConfig, funcId: Int) {
         val earbudName = if (selectedEarbud == 0) "Sol kulaklık" else "Sağ kulaklık"
         bleManager.setTouchGesture(config.keyId, funcId, earbudName, config.gestureName)
+        if (config.keyId == 7 || config.keyId == 8) longPressCheck = config.keyId to funcId
     }
 
     val currentList = if (selectedEarbud == 0) leftGestures else rightGestures
