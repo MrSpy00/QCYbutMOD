@@ -137,6 +137,9 @@ class BleConnectionManager private constructor(private val appContext: Context) 
 
     private var a2dpProfile: BluetoothA2dp? = null
     private var headsetProfile: BluetoothHeadset? = null
+    private val autoConnectAttemptAt = ConcurrentHashMap<String, Long>()
+    @Volatile
+    private var autoConnectSuspended = false
 
     init {
         ProductDatabase.initFromRaw(appContext)
@@ -167,7 +170,10 @@ class BleConnectionManager private constructor(private val appContext: Context) 
 
     private fun getCachedBleAddress(classicMac: String?): String? {
         if (classicMac.isNullOrBlank()) return null
+        // Plain key may be absent on older installs; the LAST_BLE_ fallback keeps
+        // those mappings usable instead of forcing a doomed direct-LE on BR/EDR.
         return macCachePrefs.getString(classicMac.uppercase(), null)
+            ?: macCachePrefs.getString("LAST_BLE_${classicMac.uppercase()}", null)
     }
 
     fun isLocationEnabledForBleScan(): Boolean {
@@ -689,7 +695,7 @@ class BleConnectionManager private constructor(private val appContext: Context) 
 
         allowAutoConnectOnBeacon = autoConnect
         // Refresh bonded QCY devices WITHOUT calling connectGatt yet (so we never suspend the BLE scanner!)
-        refreshBondedDevices(autoConnect = false)
+        refreshBondedDevices(autoConnect = autoConnect)
 
         if (!_isScanning.value) {
             val scanner = adapter.bluetoothLeScanner
@@ -874,12 +880,31 @@ class BleConnectionManager private constructor(private val appContext: Context) 
             }
 
             if (autoConnect && !_deviceState.value.isConnected && !_deviceState.value.isConnecting) {
-                val activeQcy = qcyBonded.find { dev ->
-                    (activeAudioAddr != null && dev.address.equals(activeAudioAddr, ignoreCase = true)) ||
-                    isDeviceConnected(dev)
+                val now = System.currentTimeMillis()
+                val activeQcy = qcyBonded.firstOrNull { dev ->
+                    AutoConnectDecision.shouldConnect(
+                        isQcy = BleAdvertisementParser.isQcyDeviceName(dev.name ?: ""),
+                        isAclConnected = (activeAudioAddr != null && dev.address.equals(activeAudioAddr, ignoreCase = true)) || isDeviceConnected(dev),
+                        lastAttemptMs = autoConnectAttemptAt[dev.address.uppercase()],
+                        nowMs = now,
+                        userStopped = autoConnectSuspended
+                    )
                 }
                 if (activeQcy != null) {
+                    autoConnectAttemptAt[activeQcy.address.uppercase()] = now
+                    _deviceState.update { it.copy(lastAutoConnectAttempt = now, lastAutoConnectResult = "deneme: ${activeQcy.name ?: activeQcy.address}") }
+                    AegisLogger.i(TAG, "Auto-connect eligible: ${activeQcy.name} (${activeQcy.address})")
                     connect(activeQcy.address)
+                } else {
+                    val suspended = autoConnectSuspended
+                    val anyAcl = qcyBonded.any { dev ->
+                        (activeAudioAddr != null && dev.address.equals(activeAudioAddr, ignoreCase = true)) || isDeviceConnected(dev)
+                    }
+                    if (anyAcl) {
+                        val reason = if (suspended) "kullanıcı bağlantıyı kesti" else "10 sn sınırı"
+                        AegisLogger.i(TAG, "Auto-connect skipped ($reason)")
+                        _deviceState.update { it.copy(lastAutoConnectResult = "atlandı: $reason") }
+                    }
                 }
             }
         } catch (e: Exception) {
@@ -902,7 +927,8 @@ class BleConnectionManager private constructor(private val appContext: Context) 
 
     // --- Connection Lifecycle ---
 
-    fun connect(address: String) {
+    fun connect(address: String, userInitiated: Boolean = false) {
+        if (userInitiated) autoConnectSuspended = false
         val adapter = bluetoothAdapter ?: return
         if (!adapter.isEnabled) return
 
@@ -1023,6 +1049,7 @@ class BleConnectionManager private constructor(private val appContext: Context) 
                 pendingConnectModelName = null
                 if (isAcl) {
                     AegisLogger.i(TAG, "No separate BLE beacon seen in 3.2s while ACL is active; trying direct LE GATT on $classicMac...")
+                    _deviceState.update { it.copy(lastAutoConnectResult = "beacon yok; doğrudan LE deneniyor") }
                     initiateGattConnection(
                         bleAddr = classicMac,
                         classicMac = classicMac,
@@ -1036,6 +1063,7 @@ class BleConnectionManager private constructor(private val appContext: Context) 
                     markDeviceUnreachable(classicMac)
                     _deviceState.update {
                         it.copy(
+                            lastAutoConnectResult = "kulaklık kapalı / kutuda (reklam yok, ACL yok)",
                             isConnected = false,
                             isConnecting = false,
                             connectingAddress = "",
@@ -1361,6 +1389,7 @@ class BleConnectionManager private constructor(private val appContext: Context) 
 
     fun disconnect() {
         userRequestedDisconnect = true
+        autoConnectSuspended = true
         autoReconnectJob?.cancel()
         autoReconnectJob = null
         com.aegissoft.qcybutmod.core.audio.EarbudAudioLocator.stopBeep()
@@ -1434,7 +1463,7 @@ class BleConnectionManager private constructor(private val appContext: Context) 
             }
         }
         if (targetAddr.isNotEmpty()) {
-            connect(targetAddr)
+            connect(targetAddr, userInitiated = true)
         } else {
             startScanning(autoConnect = true)
         }
@@ -1461,7 +1490,8 @@ class BleConnectionManager private constructor(private val appContext: Context) 
                     _deviceState.update {
                         it.copy(
                             isConnecting = true,
-                            bleAddress = gattAddr.ifEmpty { it.bleAddress }
+                            bleAddress = gattAddr.ifEmpty { it.bleAddress },
+                            lastAutoConnectResult = "bağlandı"
                         )
                     }
                     try {

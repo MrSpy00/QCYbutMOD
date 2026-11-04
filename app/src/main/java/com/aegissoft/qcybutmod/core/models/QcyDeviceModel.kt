@@ -47,6 +47,8 @@ data class QcyDeviceState(
     val channelBalance: Int = 10, // 0 (Left) to 20 (Right), 10 = Centered
     val promptVolume: Int = 8, // 0 to 15
     val firmwareVersion: String = "",
+    val lastAutoConnectAttempt: Long? = null,
+    val lastAutoConnectResult: String? = null,
     val lastKnownLat: Double? = null,
     val lastKnownLon: Double? = null,
     val rssi: Int = -100,

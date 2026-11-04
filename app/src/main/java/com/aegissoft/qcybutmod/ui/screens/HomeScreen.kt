@@ -405,6 +405,16 @@ fun HomeScreen(
 
                     if (!state.isConnected) {
                         Spacer(modifier = Modifier.height(14.dp))
+                        state.lastAutoConnectResult?.takeIf { it.isNotBlank() }?.let { result ->
+                            Text(
+                                text = "Otomatik bağlantı: $result",
+                                color = TextTertiary,
+                                fontSize = 10.sp,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                            Spacer(modifier = Modifier.height(6.dp))
+                        }
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -930,7 +940,7 @@ fun HomeScreen(
                 } else {
                     dev.bleAddress
                 }
-                bleManager.connect(targetAddr)
+                bleManager.connect(targetAddr, userInitiated = true)
             },
             onDisconnectDevice = {
                 bleManager.disconnect()
