@@ -26,9 +26,14 @@ object VoiceGenderResolver {
         return picked.name
     }
 
-    fun pitchFor(gender: String): Float = when (gender) {
-        GENDER_FEMALE -> 1.15f
-        GENDER_MALE -> 0.88f
+    /**
+     * Kadın sesi cihazda yoksa tr-TR erkek sesi 1.35 perde ile "simülasyon" kadın sesi verir.
+     * hasFemaleVoice varsayılanı true → mevcut çağrılar/testler eski davranışı korur.
+     */
+    fun pitchFor(gender: String, hasFemaleVoice: Boolean = true): Float = when {
+        gender == GENDER_FEMALE && !hasFemaleVoice -> 1.35f
+        gender == GENDER_FEMALE -> 1.15f
+        gender == GENDER_MALE -> 0.88f
         else -> 1.0f
     }
 }

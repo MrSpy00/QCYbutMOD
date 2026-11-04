@@ -115,7 +115,12 @@ class AegisVoiceAssistant private constructor(private val context: Context) : Te
     fun applySpeechSettings() {
         val rate = VoiceSettings.getTtsRate(context)
         tts?.setSpeechRate(rate)
-        tts?.setPitch(VoiceGenderResolver.pitchFor(VoiceSettings.getVoiceGender(context)))
+        val gender = VoiceSettings.getVoiceGender(context)
+        val hasFemale = hasFemaleTurkishVoice()
+        tts?.setPitch(VoiceGenderResolver.pitchFor(gender, hasFemale))
+        if (gender == "female" && !hasFemale) {
+            AegisLogger.i(TAG, "female_missing_fallback: kadın sesi yok — perde 1.35 simülasyon uygulanıyor")
+        }
         // Cinsiyet değişince ses restart beklemeden yeniden hedeflenir (idempotent)
         selectTurkishVoice()
     }

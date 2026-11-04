@@ -38,7 +38,7 @@
         android:label="QCYbutMOD"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
-        android:theme="@style/Theme.QCYbutMOD">>
+        android:theme="@style/Theme.QCYbutMOD">
 
         <activity
             android:name=".ui.MainActivity"
@@ -75,6 +75,7 @@
     <queries>
         <package android:name="com.google.android.tts" />
         <package android:name="com.google.android.apps.speechservices" />
+        <package android:name="com.android.vending" />
     </queries>
 
 </manifest>

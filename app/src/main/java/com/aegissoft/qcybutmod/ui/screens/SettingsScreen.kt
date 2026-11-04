@@ -23,8 +23,11 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import android.content.Intent
 import android.widget.Toast
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import com.aegissoft.qcybutmod.BuildConfig
 import com.aegissoft.qcybutmod.core.audio.AegisVoiceAssistant
+import com.aegissoft.qcybutmod.core.audio.FemaleVoiceInstaller
 import com.aegissoft.qcybutmod.core.audio.VoiceSettings
 import com.aegissoft.qcybutmod.core.audio.VoiceSource
 import com.aegissoft.qcybutmod.core.bluetooth.BleConnectionManager
@@ -296,6 +299,22 @@ fun SettingsScreen(
                 var ttsRate by remember { mutableStateOf(VoiceSettings.getTtsRate(context)) }
                 var ttsVolume by remember { mutableStateOf(VoiceSettings.getTtsVolume(context)) }
                 var gender by remember { mutableStateOf(VoiceSettings.getVoiceGender(context)) }
+                // TTS ayarlarından (ses paketi indirme) dönüşte sorguyu tazelemek için:
+                var resumeTick by remember { mutableStateOf(0) }
+                val lifecycleOwner = remember(context) {
+                    var c: android.content.Context? = context
+                    while (c is android.content.ContextWrapper && c !is android.app.Activity) c = c.baseContext
+                    c as? androidx.lifecycle.LifecycleOwner
+                }
+                DisposableEffect(lifecycleOwner) {
+                    val observer = LifecycleEventObserver { _, event ->
+                        if (event == Lifecycle.Event.ON_RESUME) resumeTick++
+                    }
+                    lifecycleOwner?.lifecycle?.addObserver(observer)
+                    onDispose { lifecycleOwner?.lifecycle?.removeObserver(observer) }
+                }
+                // Her recomposition'da taze sorgulanır (async TTS init + dönüş + cinsiyet değişimi)
+                val femaleVoiceReady = remember(resumeTick) { voiceAssistant.hasFemaleTurkishVoice() }
 
                 Column(modifier = Modifier.fillMaxWidth()) {
                     Row(
@@ -502,13 +521,100 @@ fun SettingsScreen(
                             }
                         }
 
-                        if (!voiceAssistant.hasFemaleTurkishVoice()) {
-                            Text(
-                                text = "Cihazda Türkçe kadın sesi bulunamadı — Google TTS uygulamasından Türkçe ses paketini indirin.",
-                                color = WarningAmber,
-                                fontSize = 10.5.sp,
-                                lineHeight = 14.sp
-                            )
+                        if (!femaleVoiceReady) {
+                            Surface(
+                                shape = RoundedCornerShape(12.dp),
+                                color = DarkSurfaceVariant,
+                                border = BorderStroke(1.dp, DarkBorder),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Column(modifier = Modifier.padding(12.dp)) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Icon(
+                                            imageVector = Icons.Rounded.RecordVoiceOver,
+                                            contentDescription = null,
+                                            tint = WarningAmber,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Text(
+                                            text = "Türkçe kadın sesi yüklü değil",
+                                            color = TextPrimary,
+                                            fontSize = 12.sp,
+                                            fontWeight = FontWeight.SemiBold,
+                                            modifier = Modifier.weight(1f)
+                                        )
+                                    }
+                                    Spacer(modifier = Modifier.height(6.dp))
+                                    FemaleVoiceInstaller.guidance.forEach { line ->
+                                        Text(
+                                            text = "• $line",
+                                            color = TextTertiary,
+                                            fontSize = 10.sp,
+                                            lineHeight = 14.sp
+                                        )
+                                    }
+                                    if (gender == "female") {
+                                        Spacer(modifier = Modifier.height(4.dp))
+                                        Text(
+                                            text = "Ses paketi gelene kadar kadın ses perdesi simülasyonla çalışır (1.35×).",
+                                            color = WarningAmber,
+                                            fontSize = 10.sp,
+                                            lineHeight = 14.sp
+                                        )
+                                    }
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    Button(
+                                        onClick = {
+                                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                            val ok = runCatching {
+                                                FemaleVoiceInstaller.open(context)
+                                            }.getOrDefault(false)
+                                            if (!ok) {
+                                                Toast.makeText(
+                                                    context,
+                                                    "Ses paketi ekranı açılamadı — Google TTS kurulu değil.",
+                                                    Toast.LENGTH_LONG
+                                                ).show()
+                                            }
+                                        },
+                                        modifier = Modifier.fillMaxWidth(),
+                                        colors = ButtonDefaults.buttonColors(
+                                            containerColor = theme.primary.copy(alpha = 0.15f)
+                                        ),
+                                        shape = RoundedCornerShape(10.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Rounded.Download,
+                                            contentDescription = null,
+                                            tint = theme.primary,
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text(
+                                            text = "Ses paketini indir",
+                                            color = theme.primary,
+                                            fontSize = 12.sp,
+                                            fontWeight = FontWeight.SemiBold
+                                        )
+                                    }
+                                }
+                            }
+                        } else {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    imageVector = Icons.Rounded.CheckCircle,
+                                    contentDescription = null,
+                                    tint = SuccessGreen,
+                                    modifier = Modifier.size(14.dp)
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(
+                                    text = "Türkçe kadın sesi hazır",
+                                    color = SuccessGreen,
+                                    fontSize = 11.sp
+                                )
+                            }
                         }
 
                         Spacer(modifier = Modifier.height(4.dp))
