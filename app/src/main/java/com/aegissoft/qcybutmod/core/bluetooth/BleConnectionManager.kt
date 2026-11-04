@@ -57,6 +57,9 @@ class BleConnectionManager private constructor(private val appContext: Context) 
 
     fun clearActionHistory() = actionMemory.clear()
 
+    fun recordFeatureAction(feature: String, success: Boolean, detail: String = "") =
+        actionMemory.record(feature, _deviceState.value.modelName, success, detail)
+
     private fun gateFeature(feature: String): Boolean {
         val state = _deviceState.value
         return when (val r = FeatureGate.requireConnected(state, feature)) {

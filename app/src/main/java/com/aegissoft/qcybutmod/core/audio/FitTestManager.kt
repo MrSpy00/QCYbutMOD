@@ -12,10 +12,13 @@ import android.util.Log
 import com.aegissoft.qcybutmod.R
 import com.aegissoft.qcybutmod.core.bluetooth.BleConnectionManager
 import com.aegissoft.qcybutmod.core.bluetooth.QcyProtocol
+import com.aegissoft.qcybutmod.core.models.QcyDeviceState
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.selects.select
 import java.io.ByteArrayOutputStream
+
+enum class FitTestError { NOT_CONNECTED, PERMISSION_DENIED, SCO_UNAVAILABLE, LOW_CONFIDENCE, UNKNOWN }
 
 sealed class FitTestState {
     object Idle : FitTestState()
@@ -25,7 +28,10 @@ sealed class FitTestState {
         val rightGood: Boolean,
         val overallPassed: Boolean
     ) : FitTestState()
-    data class Failed(val reason: String) : FitTestState()
+    data class Failed(
+        val reason: String,
+        val kind: FitTestError = FitTestError.UNKNOWN
+    ) : FitTestState()
 }
 
 class FitTestManager(
@@ -35,7 +41,19 @@ class FitTestManager(
     companion object {
         private const val TAG = "FitTestManager"
         private const val SAMPLE_RATE = 16000
+
+        /** Bağlı değilse test başlatılamaz; JVM-test edilebilir. */
+        fun gateFailureFor(state: QcyDeviceState): FitTestState.Failed? =
+            if (state.isConnected) null
+            else FitTestState.Failed(
+                reason = "Kulaklık bağlı değil — akustik test başlatılamaz.",
+                kind = FitTestError.NOT_CONNECTED
+            )
     }
+
+    private class ScoUnavailableException : Exception("Bluetooth SCO ses profili kullanılamıyor")
+
+    private class LowConfidenceException : Exception("LOW_CONFIDENCE")
 
     private val _testState = MutableStateFlow<FitTestState>(FitTestState.Idle)
     val testState: StateFlow<FitTestState> = _testState.asStateFlow()
@@ -43,37 +61,15 @@ class FitTestManager(
     private var testJob: Job? = null
     private val scope = CoroutineScope(Dispatchers.Main + SupervisorJob())
 
-    fun startTest(recoveryAttempted: Boolean = false) {
+    fun startTest() {
         if (_testState.value is FitTestState.InProgress) return
 
         val initialState = bleManager.deviceState.value
-        if (!initialState.isConnected) {
-            if (recoveryAttempted) {
-                _testState.value = FitTestState.Failed(
-                    "Kulaklık bağlı değil. Lütfen önce kulaklığınızı bağlayın ve kulağınıza takın."
-                )
-                AegisVoiceAssistant.getInstance(context).speak(
-                    "Kulaklık bağlı değil. Lütfen önce kulaklığı bağlayın."
-                )
-                return
-            }
-            // Classic ACL can be alive while GATT dropped (buds on, brief link loss):
-            // kick auto-reconnect and wait in scope (withTimeoutOrNull is suspend-only).
-            // Bounded by recoveryAttempted - a second failure reports immediately.
-            try {
-                bleManager.reconnectSelectedDevice()
-            } catch (e: Exception) {
-                Log.w(TAG, "Reconnect kick failed", e)
-            }
-            testJob = scope.launch {
-                runCatching {
-                    withTimeoutOrNull(6_000L) {
-                        bleManager.deviceState.map { it.isConnected }.first { it }
-                    }
-                }
-                // recovered -> gate passes and test starts; timeout -> fail branch hits
-                startTest(recoveryAttempted = true)
-            }
+        gateFailureFor(initialState)?.let { failed ->
+            _testState.value = failed
+            AegisVoiceAssistant.getInstance(context).speak(
+                "Kulaklık bağlı değil. Lütfen önce kulaklığı bağlayın."
+            )
             return
         }
 
@@ -125,6 +121,7 @@ class FitTestManager(
 
                 var leftGood = false
                 var rightGood = false
+                var lowConfidence = false
                 select<Unit> {
                     bleResult.onAwait { result ->
                         leftGood = result.leftEarGoodSeal
@@ -133,30 +130,45 @@ class FitTestManager(
                     }
                     ears.onAwait { result ->
                         val (recLeft, recRight) = result.getOrThrow()
-                        val analyzed = withContext(Dispatchers.IO) {
-                            FitTestAnalyzer.isGoodFit(FitTestAnalyzer.analyze(wavPcm, recLeft)) to
-                                FitTestAnalyzer.isGoodFit(FitTestAnalyzer.analyze(wavPcm, recRight))
+                        if (hasSignal(recLeft) && hasSignal(recRight)) {
+                            val analyzed = withContext(Dispatchers.IO) {
+                                FitTestAnalyzer.isGoodFit(FitTestAnalyzer.analyze(wavPcm, recLeft)) to
+                                    FitTestAnalyzer.isGoodFit(FitTestAnalyzer.analyze(wavPcm, recRight))
+                            }
+                            leftGood = analyzed.first
+                            rightGood = analyzed.second
+                        } else {
+                            lowConfidence = true
                         }
-                        leftGood = analyzed.first
-                        rightGood = analyzed.second
                     }
                 }
-
+                if (lowConfidence) {
+                    _testState.value = FitTestState.Failed(
+                        reason = "Mikrofon zayıf sinyal aldı. Ortamın sessiz olduğundan ve kulaklıkların takılı olduğundan emin olup tekrar deneyin.",
+                        kind = FitTestError.LOW_CONFIDENCE
+                    )
+                    recordAction(false, "zayıf sinyal")
+                    AegisVoiceAssistant.getInstance(context).speak("Sonuç güvenilir değil. Tekrar deneyin.")
+                } else {
                 val passed = leftGood && rightGood
                 _testState.value = FitTestState.Completed(
                     leftGood = leftGood,
                     rightGood = rightGood,
                     overallPassed = passed
                 )
+                recordAction(true, if (passed) "sol+sağ iyi" else "yalıtım zayıf")
                 AegisVoiceAssistant.getInstance(context).speak(
                     if (passed) "Kulak uyum testi tamamlandı. Sol ve sağ kulaklıkta akustik yalıtım mükemmel."
                     else "Kulak uyum testi tamamlandı. Kulaklık silikon uçlarını kontrol edip tekrar deneyin."
                 )
+                }
             } catch (e: SecurityException) {
                 Log.e(TAG, "Microphone permission missing", e)
                 _testState.value = FitTestState.Failed(
-                    "Mikrofon izni verilmedi. Akustik testi başlatmak için mikrofon izni gereklidir."
+                    reason = "Mikrofon izni verilmedi. Akustik testi başlatmak için mikrofon izni gereklidir.",
+                    kind = FitTestError.PERMISSION_DENIED
                 )
+                recordAction(false, "mikrofon izni yok")
                 AegisVoiceAssistant.getInstance(context).speak(
                     "Mikrofon izni verilmedi. Lütfen izin verip tekrar deneyin."
                 )
@@ -164,7 +176,12 @@ class FitTestManager(
                 throw e
             } catch (e: Exception) {
                 Log.e(TAG, "Fit test failed", e)
-                _testState.value = FitTestState.Failed(e.localizedMessage ?: "Bilinmeyen hata")
+                val kind = if (e is ScoUnavailableException) FitTestError.SCO_UNAVAILABLE else FitTestError.UNKNOWN
+                _testState.value = FitTestState.Failed(
+                    reason = e.localizedMessage ?: "Bilinmeyen hata",
+                    kind = kind
+                )
+                recordAction(false, e.localizedMessage ?: "bilinmeyen hata")
             } finally {
                 collector?.cancel()
                 measurement?.cancel()
@@ -177,7 +194,7 @@ class FitTestManager(
     }
 
     private suspend fun startSco(audioManager: AudioManager) {
-        if (!audioManager.isBluetoothScoAvailableOffCall) return
+        if (!audioManager.isBluetoothScoAvailableOffCall) throw ScoUnavailableException()
         if (audioManager.isBluetoothScoOn) audioManager.stopBluetoothSco()
         audioManager.startBluetoothSco()
         var attempts = 100
@@ -260,6 +277,18 @@ class FitTestManager(
             val p = i * 2
             (((bytes[p + 1].toInt() and 0xFF) shl 8) or (bytes[p].toInt() and 0xFF)).toShort()
         }
+    }
+
+    private fun recordAction(success: Boolean, detail: String) {
+        runCatching { bleManager.recordFeatureAction("Uyum testi", success, detail) }
+    }
+
+    /** Boş/zayıf kayıt = güvenilmez sonuç (ör. SCO hiç başlamadıysa). */
+    private fun hasSignal(pcm: ShortArray): Boolean {
+        if (pcm.size < 800) return false
+        var nonZero = 0
+        for (s in pcm) if (s != 0.toShort()) nonZero++
+        return nonZero > pcm.size / 100
     }
 
     fun cancelTest() {

@@ -1,7 +1,10 @@
 package com.aegissoft.qcybutmod.ui.screens
 
 import android.Manifest
+import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
+import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.*
@@ -25,6 +28,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
+import com.aegissoft.qcybutmod.core.audio.FitTestError
 import com.aegissoft.qcybutmod.core.audio.FitTestManager
 import com.aegissoft.qcybutmod.core.audio.FitTestState
 import com.aegissoft.qcybutmod.core.bluetooth.BleConnectionManager
@@ -41,10 +45,16 @@ fun FitTestScreen(
     val fitTestManager = remember { FitTestManager(context, bleManager) }
     val testState by fitTestManager.testState.collectAsState()
 
+    var micDenied by remember { mutableStateOf(false) }
     val micPermissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
     ) { perms ->
-        if (perms.values.all { it }) fitTestManager.startTest()
+        if (perms.values.all { it }) {
+            micDenied = false
+            fitTestManager.startTest()
+        } else {
+            micDenied = true
+        }
     }
 
     DisposableEffect(Unit) {
@@ -249,16 +259,154 @@ fun FitTestScreen(
                 }
             }
             is FitTestState.Failed -> {
-                Text(
-                    text = "Test başarısız oldu. Lütfen tekrar deneyin.",
-                    color = DangerRed,
-                    fontSize = 15.sp,
-                    fontWeight = FontWeight.Medium
-                )
+                val failed = testState as FitTestState.Failed
+                val title: String
+                val solution: String
+                val failIcon = when (failed.kind) {
+                    FitTestError.NOT_CONNECTED -> {
+                        title = "Kulaklık Bağlı Değil"
+                        solution = "Kulaklığı bağlayıp tekrar deneyin."
+                        Icons.Rounded.BluetoothDisabled
+                    }
+                    FitTestError.PERMISSION_DENIED -> {
+                        title = "Mikrofon İznı Gerekli"
+                        solution = "Akustik test, telefon mikrofonuyla ölçüm yapar."
+                        Icons.Rounded.MicOff
+                    }
+                    FitTestError.SCO_UNAVAILABLE -> {
+                        title = "Bluetooth Ses Profili Kullanılamıyor"
+                        solution = "Kulaklığı yeniden bağlayın; başka bir uygulama sesi meşgul ediyor olabilir."
+                        Icons.Rounded.BluetoothAudio
+                    }
+                    FitTestError.LOW_CONFIDENCE -> {
+                        title = "Sonuç Güvenilir Değil"
+                        solution = "Sessiz bir ortamda, kulaklıklar takılıyken tekrar deneyin."
+                        Icons.Rounded.Info
+                    }
+                    FitTestError.UNKNOWN -> {
+                        title = "Test Başarısız Oldu"
+                        solution = "Birkaç saniye sonra tekrar deneyin."
+                        Icons.Rounded.ErrorOutline
+                    }
+                }
+                AegisCard(modifier = Modifier.fillMaxWidth()) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = failIcon,
+                            contentDescription = null,
+                            tint = DangerRed,
+                            modifier = Modifier.size(28.dp)
+                        )
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Column {
+                            Text(
+                                text = title,
+                                color = DangerRed,
+                                fontSize = 15.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = failed.reason,
+                                color = TextSecondary,
+                                fontSize = 12.sp
+                            )
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Text(
+                        text = "Çözüm: $solution",
+                        color = TextTertiary,
+                        fontSize = 11.sp
+                    )
+                    if (failed.kind == FitTestError.PERMISSION_DENIED) {
+                        Spacer(modifier = Modifier.height(10.dp))
+                        OutlinedButton(
+                            onClick = {
+                                runCatching {
+                                    context.startActivity(
+                                        Intent(
+                                            Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                                            Uri.parse("package:${context.packageName}")
+                                        )
+                                    )
+                                }
+                            },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Icon(
+                                imageVector = Icons.Rounded.Settings,
+                                contentDescription = null,
+                                tint = theme.primary,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("Uygulama ayarlarını aç", color = theme.primary, fontSize = 13.sp)
+                        }
+                    } else {
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Text(
+                            text = "Tekrar denemek için aşağıdaki butonu kullanın.",
+                            color = TextTertiary,
+                            fontSize = 11.sp
+                        )
+                    }
+                }
             }
         }
 
         Spacer(modifier = Modifier.weight(1f))
+
+        if (micDenied && testState is FitTestState.Idle) {
+            AegisCard(modifier = Modifier.fillMaxWidth()) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = Icons.Rounded.MicOff,
+                        contentDescription = null,
+                        tint = WarningAmber,
+                        modifier = Modifier.size(22.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Column {
+                        Text(
+                            text = "Mikrofon izni gerekli",
+                            color = WarningAmber,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = "Testi başlatmak için mikrofon iznini verin.",
+                            color = TextTertiary,
+                            fontSize = 11.sp
+                        )
+                    }
+                }
+                Spacer(modifier = Modifier.height(8.dp))
+                OutlinedButton(
+                    onClick = {
+                        runCatching {
+                            context.startActivity(
+                                Intent(
+                                    Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                                    Uri.parse("package:${context.packageName}")
+                                )
+                            )
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.Settings,
+                        contentDescription = null,
+                        tint = theme.primary,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("Uygulama ayarlarını aç", color = theme.primary, fontSize = 13.sp)
+                }
+            }
+            Spacer(modifier = Modifier.height(12.dp))
+        }
 
         // Action Button
         Button(
