@@ -1,0 +1,59 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 108 108" width="108" height="108">
+  <defs>
+    <!-- Background Gradient -->
+    <radialGradient id="bgVignette" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#1A0006" />
+      <stop offset="60%" stop-color="#080003" />
+      <stop offset="100%" stop-color="#000000" />
+    </radialGradient>
+
+    <!-- Headband Gradient -->
+    <linearGradient id="headbandGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FF4B6E" />
+      <stop offset="50%" stop-color="#FF1744" />
+      <stop offset="100%" stop-color="#B70929" />
+    </linearGradient>
+
+    <!-- Ear Cup Gradient -->
+    <linearGradient id="cupGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FF2A55" />
+      <stop offset="100%" stop-color="#D5002B" />
+    </linearGradient>
+
+    <!-- Subtle Glow Filter -->
+    <filter id="crimsonGlow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="#FF1744" flood-opacity="0.35" />
+    </filter>
+  </defs>
+
+  <!-- Pitch Black Squircle Container -->
+  <rect width="108" height="108" rx="24" ry="24" fill="url(#bgVignette)" stroke="#22FF1744" stroke-width="1.2" />
+
+  <!-- Outer Precision Studio Ring -->
+  <circle cx="54" cy="54" r="38" fill="none" stroke="#FF1744" stroke-width="0.8" stroke-opacity="0.25" stroke-dasharray="2 3" />
+
+  <!-- Headband Arc -->
+  <path d="M31,55 C31,39.5 41.2,29 54,29 C66.8,29 77,39.5 77,55" fill="none" stroke="url(#headbandGrad)" stroke-width="5.2" stroke-linecap="round" filter="url(#crimsonGlow)" />
+
+  <!-- Inner Headband Accent -->
+  <path d="M39,37 C43,33.5 48.2,31.8 54,31.8 C59.8,31.8 65,33.5 69,37" fill="none" stroke="#FF6B88" stroke-width="1.8" stroke-linecap="round" stroke-opacity="0.9" />
+
+  <!-- Left Ear Cup Shell -->
+  <path d="M33,48 C36.3,48 39,50.7 39,54 L39,67 C39,70.3 36.3,73 33,73 C28.6,73 25,69.4 25,65 L25,56 C25,51.6 28.6,48 33,48 Z" fill="url(#cupGrad)" filter="url(#crimsonGlow)" />
+
+  <!-- Right Ear Cup Shell -->
+  <path d="M75,48 C79.4,48 83,51.6 83,56 L83,65 C83,69.4 79.4,73 75,73 C71.7,73 69,70.3 69,67 L69,54 C69,50.7 71.7,48 75,48 Z" fill="url(#cupGrad)" filter="url(#crimsonGlow)" />
+
+  <!-- Left Inner Cushion -->
+  <path d="M36.5,51.5 C37.9,51.5 39,52.6 39,54 L39,67 C39,68.4 37.9,69.5 36.5,69.5 C35.1,69.5 34,68.4 34,67 L34,54 C34,52.6 35.1,51.5 36.5,51.5 Z" fill="#160206" />
+
+  <!-- Right Inner Cushion -->
+  <path d="M71.5,51.5 C72.9,51.5 74,52.6 74,54 L74,67 C74,68.4 72.9,69.5 71.5,69.5 C70.1,69.5 69,68.4 69,67 L69,54 C69,52.6 70.1,51.5 71.5,51.5 Z" fill="#160206" />
+
+  <!-- Center Acoustic Pulse Equalizer Bars -->
+  <line x1="54" y1="46" x2="54" y2="68" stroke="#FF1744" stroke-width="3.2" stroke-linecap="round" />
+  <line x1="48" y1="51" x2="48" y2="63" stroke="#FF4B6E" stroke-width="2.6" stroke-linecap="round" />
+  <line x1="60" y1="51" x2="60" y2="63" stroke="#FF4B6E" stroke-width="2.6" stroke-linecap="round" />
+  <line x1="43" y1="55" x2="43" y2="59" stroke="#D5002B" stroke-width="2.2" stroke-linecap="round" />
+  <line x1="65" y1="55" x2="65" y2="59" stroke="#D5002B" stroke-width="2.2" stroke-linecap="round" />
+</svg>
