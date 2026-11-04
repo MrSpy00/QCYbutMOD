@@ -24,7 +24,6 @@
 
 ## 3. Derleme & Canlı Yükleme
 ```powershell
-cd "X:\mrspy\Reverse Engineering\Projeler\QCYbutMOD"
 .\gradlew.bat :app:testDebugUnitTest :app:assembleDebug
 adb install -r app\build\outputs\apk\debug\app-debug.apk
 adb shell am start -n com.aegissoft.qcybutmod.debug/com.aegissoft.qcybutmod.ui.MainActivity
@@ -161,7 +160,7 @@ Plan: `.superpowers/sdd/qcybutmod-hata-dzeltme-ve-kapa-2026-11-02-approved/`. Do
 - Canlı ekran görüntüsü doğrulaması bir sonraki ADB oturumuna ertelendi (kompozisyon derleme ile doğrulandı).
 
 ## 10. Kapsamlı Hata Giderme & Yüzey Turu — Görev 1–11 (2026-11-04)
-Plan: `C:\Users\mrSpy\.plannotator\plans\qcybutmod-son-hata-giderme-ve--2026-11-04-approved.md` (11 görev). **Doğrulama: 95 JVM testi / 18 suite / 0 hata + `assembleDebug` + `assembleRelease` BUILD SUCCESSFUL + release cihazda canlı (3× soğuk başlatma, çökme yok).**
+Plan: `.planning/plans/qcybutmod-son-hata-giderme-ve-2026-11-04-approved.md` (11 görev). **Doğrulama: 95 JVM testi / 18 suite / 0 hata + `assembleDebug` + `assembleRelease` BUILD SUCCESSFUL + release cihazda canlı (3× soğuk başlatma, çökme yok).**
 Commit ledger: `4be896d` → `cbe26e4` → `49cd5b0` → `fa936e2` → `a17e999` → `2a25b63` → `b5eadd2` → `5c0ce56` → `bc60622` → `c0c9b38`.
 
 1. **KÖK NEDEN — Paylaşılan APK'daki açılış çökmesi (kullanıcı isteği #1) ÇÖZÜLDÜ (`c0c9b38`):** DropBox forensics (`adb shell dumpsys dropbox --print`) 6 identical `data_app_crash` üretti: `java.lang.SecurityException: Need android.permission.BLUETOOTH_CONNECT … A2dpServiceBinder` → `BleConnectionManager.registerProfileProxyListeners$1.onServiceConnected (:235)` → ana iş parçacığında yakalanmamış → taze kurulumda (izin henüz verilmemişken) her açılışta çökme. **Yerelde debug nedeniyle hiç üretilmedi** (cihazda izin zaten veriliydi). Düzeltme: `hasBtConnectPermission()` guard + try/catch A2DP geri çağrısında; `systemBtReceiver.onReceive` tüm gövdesi try/catch; `connect()` girişinde izin erken çıkışı. **Kanıt:** izin verilmemiş taze release kurulumu → 3× soğuk başlatma → süreç ayakta, odak MainActivity, DropBox kaydı 6'da sabit (yeni yok). CrashReporter açılışta çalıştı (DropBox `Crash-Handler` satırı) — "Hata kaydını paylaş" butonu bu yoldan besleniyor.
