@@ -5,8 +5,8 @@
 </p>
 
 <p align="center">
-  <strong>QCY Kulaklıkları İçin Yeni Nesil, Gizlilik Odaklı & Telemetri Düzeyinde Kontrol Süiti</strong><br>
-  <em>Next-Generation, Privacy-First & Telemetry-Grade Control Suite for QCY Earbuds</em><br>
+  <strong>QCY Kulaklıkları İçin Gizlilik Odaklı & Reklamsız Kontrol Süiti</strong><br>
+  <em>Privacy-First & Bloat-Free Companion Suite for QCY Earbuds</em><br>
   <sub>Tersine Mühendislikle Sıfırdan Geliştirilmiş • Reklamsız • Tamamen Çevrimdışı • AMOLED Uyumlu</sub>
 </p>
 
@@ -29,7 +29,7 @@
 
 ## ⚡ Genel Bakış
 
-**QCYbutMOD**, resmi üretici uygulamasının getirdiği gereksiz telemetri yükünü, zorunlu hesap girişlerini, arka plan veri toplamasını ve hantal arayüzü ortadan kaldırmak amacıyla **[aegisSoft](https://aegissoft.com.tr)** ve **[mrSpy](https://github.com/MrSpy00)** tarafından sıfırdan **Jetpack Compose (Material 3)** ve adli tersine mühendislik yöntemleriyle geliştirilmiş modern bir Android kontrol süitidir.
+**QCYbutMOD**, resmi üretici uygulamasının getirdiği gereksiz telemetri yükünü, zorunlu hesap girişlerini, arka plan veri toplamasını ve hantal arayüzü ortadan kaldırmak amacıyla **[aegisSoft](https://aegissoft.com.tr)** ve **[mrSpy](https://github.com/MrSpy00)** tarafından sıfırdan **Jetpack Compose (Material 3)** ve BLE tersine mühendislik yöntemleriyle geliştirilmiş bir Android kontrol uygulamasıdır.
 
 Uygulama; **Wuqi SoC** (WQ7033 / WQ7034 çipset mimarisi; QCY MeloBuds Pro, N20, H4 ve `products.json` tabanındaki 199+ model) donanım protokolünü doğrudan Bluetooth Düşük Enerji (BLE GATT) seviyesinde konuşur. Stok uygulamada sunulmayan donanımsal susturma, gerçek ham pil verisi, yapay zekâ destekli canlı çeviri ve tam dokunmatik kontrol özgürlüğü sağlar.
 
@@ -37,7 +37,7 @@ Uygulama; **Wuqi SoC** (WQ7033 / WQ7034 çipset mimarisi; QCY MeloBuds Pro, N20,
 
 ## 🚀 Öne Çıkan Özellikler
 
-### 🎧 1. Donanımsal Ses ve Adli BLE Hattı
+### 🎧 1. Donanımsal Ses ve BLE GATT Hattı
 * **Donanımsal Firmware Ses Susturma (0x1D):** Kulaklığın dahili İngilizce sesli istemlerini donanım DSP seviyesinde (`Tone Volume = 0`) susturarak çift ses konuşma çakışmasını tamamen yok eder.
 * **aegis TR Sesli Asistanı:** Android TTS altyapısıyla çalışan, kadın/erkek ses seçimi ve perde ayarlaması sunan, tek dokunuşla Google Türkçe ses paketini kurabilen yerel sesli bildirim motoru.
 * **Gerçek Ham Pil Telemetrisi (Ground Truth):** Yuvarlama yapmayan, doğrudan 3 baytlık GATT `0008` karakteristiğini okuyarak Sol (%8), Sağ (%41) ve Kutu seviyelerini birbirinden bağımsız anlık takip eden mimari.
@@ -113,7 +113,7 @@ cd QCYbutMOD
 
 ## ⚡ Overview
 
-**QCYbutMOD** is an advanced, bloat-free Android application built from scratch with **Jetpack Compose (Material 3)**. It replaces proprietary, telemetry-heavy companion software with an open, highly responsive, and forensic-grade Bluetooth Low Energy (BLE) engine specifically engineered for **Wuqi SoC** architectures (WQ7033 / WQ7034, QCY MeloBuds Pro, N20, H4, and over 199+ models from `products.json`).
+**QCYbutMOD** is an open, bloat-free Android application built from scratch with **Jetpack Compose (Material 3)**. It replaces proprietary, telemetry-heavy companion software with a clean Bluetooth Low Energy (BLE) engine built for **Wuqi SoC** architectures (WQ7033 / WQ7034, QCY MeloBuds Pro, N20, H4, and 199+ models from `products.json`).
 
 Developed by **[aegisSoft](https://aegissoft.com.tr)** and **[mrSpy](https://github.com/MrSpy00)**, QCYbutMOD respects user privacy, operates completely offline without tracking, and unlocks hardware-level customization unavailable in stock vendor software.
 
@@ -121,7 +121,7 @@ Developed by **[aegisSoft](https://aegissoft.com.tr)** and **[mrSpy](https://git
 
 ## 🚀 Key Features
 
-### 🎧 1. Forensic BLE & Audio Hardware Control
+### 🎧 1. Direct BLE & Audio Hardware Control
 * **Hardware Prompt Muting (0x1D):** Suppresses native firmware English voice prompts at the DSP level (`Tone Volume = 0`), eliminating disruptive double-announcements.
 * **aegis TR Voice Assistant:** Seamless voice feedback powered by Android TTS with automatic female/male voice resolution, pitch tuning, and one-tap Google TTS voice asset downloader.
 * **Ground-Truth Battery Telemetry:** Reads unrounded, authoritative 3-byte GATT `0008` telemetry directly from the earbuds (Left, Right, and Case independent channels).
